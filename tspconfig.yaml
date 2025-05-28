@@ -1,0 +1,10 @@
+# TypeSpec configuration for template-health-endpoint project
+emit:
+  - "@typespec/openapi3"
+  - "@typespec/json-schema"
+
+options:
+  "@typespec/openapi3":
+    omit-unreachable-types: true
+  "@typespec/json-schema":
+    bundleId: "health-api"

@@ -1,0 +1,19 @@
+openapi: 3.0.0
+info:
+  title: Template Health Endpoint API
+  version: 1.0.0
+  description: |-
+    Template Health Endpoint API
+
+    A comprehensive TypeSpec-driven health endpoint template system
+    supporting four tiers of complexity: Basic, Intermediate, Advanced, Enterprise
+tags: []
+paths: {}
+components: {}
+servers:
+  - url: http://localhost:8080
+    description: Development server
+    variables: {}
+  - url: https://api.example.com
+    description: Production server
+    variables: {}

@@ -1,0 +1,33 @@
+{
+  "name": "template-health-endpoint",
+  "version": "1.0.0",
+  "description": "TypeSpec-driven health endpoint template generation system",
+  "scripts": {
+    "validate-schemas": "./scripts/validate-schemas.sh",
+    "compile-schemas": "tsp compile .",
+    "generate-openapi": "tsp compile . --emit @typespec/openapi3",
+    "generate-json-schema": "tsp compile . --emit @typespec/json-schema",
+    "format": "tsp format **/*.tsp",
+    "lint": "tsp compile . --no-emit"
+  },
+  "devDependencies": {
+    "@typespec/compiler": "^0.50.0",
+    "@typespec/http": "^0.50.0",
+    "@typespec/rest": "^0.50.0",
+    "@typespec/openapi3": "^0.50.0",
+    "@typespec/json-schema": "^0.50.0",
+    "@typespec/prettier-plugin-typespec": "^0.50.0"
+  },
+  "keywords": [
+    "typespec",
+    "health-check",
+    "api",
+    "template",
+    "openapi",
+    "json-schema",
+    "kubernetes",
+    "observability"
+  ],
+  "author": "BMAD Method",
+  "license": "MIT"
+}
