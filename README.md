@@ -1,5 +1,7 @@
 # The BMAD-Method 3.1 (Breakthrough Method of Agile (ai-driven) Development)
 
+🚀 **[Get Started with Our Complete User Guide](docs/USER_GUIDE.md)** | 🌟 **[See Why BMAD-METHOD is Revolutionary](docs/SALES_PITCH.md)**
+
 Demo of the BMad Agent entire workflow output from the web agent can be found in [Demos](./demos/readme.md) - and if you want to read a really long transcript of me talking to the multiple personality BMad Agent that produced the demo content - you can read the [full transcript](https://gemini.google.com/share/41fb640b63b0) here.
 
 ## Web Quickstart Project Setup (Recommended)
