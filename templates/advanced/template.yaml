@@ -1,5 +1,5 @@
 name: advanced
-description: Advanced tier health endpoint template
+description: Advanced tier health endpoint template with full observability
 tier: advanced
 features:
   kubernetes: true
@@ -7,4 +7,7 @@ features:
   docker: true
   opentelemetry: true
   cloudevents: true
+  dependencies: true
+  server_timing: true
+  metrics: true
 version: "1.0.0"
