@@ -1,5 +1,5 @@
 name: enterprise
-description: Enterprise tier health endpoint template
+description: Enterprise tier health endpoint template with security, compliance, and multi-environment support
 tier: enterprise
 features:
   kubernetes: true
@@ -7,4 +7,13 @@ features:
   docker: true
   opentelemetry: true
   cloudevents: true
+  dependencies: true
+  server_timing: true
+  metrics: true
+  mtls: true
+  rbac: true
+  audit_logging: true
+  multi_environment: true
+  security_middleware: true
+  compliance_reporting: true
 version: "1.0.0"

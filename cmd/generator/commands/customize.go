@@ -135,7 +135,7 @@ func runCustomizeTemplate(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("✅ Customized project generated successfully!\n")
 	fmt.Printf("   Output directory: %s\n", customizeOutputDir)
-	
+
 	return nil
 }
 
@@ -145,22 +145,22 @@ type Customization struct {
 	ProjectName string `yaml:"project_name"`
 	GoModule    string `yaml:"go_module"`
 	BaseTier    string `yaml:"base_tier"`
-	
+
 	// Features
 	Features FeatureCustomization `yaml:"features"`
-	
+
 	// Dependencies
 	Dependencies DependencyCustomization `yaml:"dependencies"`
-	
+
 	// Environment settings
 	Environment EnvironmentCustomization `yaml:"environment"`
-	
+
 	// Security settings
 	Security SecurityCustomization `yaml:"security"`
-	
+
 	// Observability settings
 	Observability ObservabilityCustomization `yaml:"observability"`
-	
+
 	// Kubernetes settings
 	Kubernetes KubernetesCustomization `yaml:"kubernetes"`
 }
@@ -275,7 +275,7 @@ func loadBaseCustomization() (*Customization, error) {
 
 // runInteractiveCustomization runs the interactive customization wizard
 func runInteractiveCustomization(c *Customization) error {
-	reader := bufio.NewReader(os.Stdin)
+	_ = bufio.NewReader(os.Stdin)
 
 	// Project settings
 	fmt.Println("\n📋 Project Settings")
@@ -330,7 +330,7 @@ func showCustomizationSummary(c *Customization) {
 	fmt.Printf("Go Module:        %s\n", c.GoModule)
 	fmt.Printf("Base Tier:        %s\n", c.BaseTier)
 	fmt.Printf("Output Directory: %s\n", customizeOutputDir)
-	
+
 	fmt.Println("\nEnabled Features:")
 	if c.Features.TypeScript { fmt.Println("  ✅ TypeScript client SDK") }
 	if c.Features.Docker { fmt.Println("  ✅ Docker configuration") }
@@ -340,12 +340,12 @@ func showCustomizationSummary(c *Customization) {
 	if c.Features.Dependencies { fmt.Println("  ✅ Dependency health checks") }
 	if c.Security.EnableMTLS { fmt.Println("  ✅ Mutual TLS (mTLS)") }
 	if c.Security.EnableRBAC { fmt.Println("  ✅ Role-based access control") }
-	
+
 	fmt.Printf("\nObservability:\n")
 	fmt.Printf("  Metrics:  %v\n", c.Observability.MetricsEnabled)
 	fmt.Printf("  Tracing:  %v\n", c.Observability.TracingEnabled)
 	fmt.Printf("  Log Level: %s\n", c.Observability.LoggingLevel)
-	
+
 	if c.Features.Kubernetes {
 		fmt.Printf("\nKubernetes:\n")
 		fmt.Printf("  Namespace: %s\n", c.Kubernetes.Namespace)
@@ -357,17 +357,46 @@ func showCustomizationSummary(c *Customization) {
 
 // generateCustomizedProject generates the project with customizations
 func generateCustomizedProject(c *Customization) error {
-	// Convert customization to generator config
-	genConfig := &config.GeneratorConfig{
-		ProjectName: c.ProjectName,
+	// Convert customization to project config
+	projectConfig := &config.ProjectConfig{
+		Name:        c.ProjectName,
 		GoModule:    c.GoModule,
-		Tier:        c.BaseTier,
+		Tier:        config.TemplateTier(c.BaseTier),
 		OutputDir:   customizeOutputDir,
-		Features:    convertFeatures(c.Features),
+		Version:     "1.0.0",
+		Description: fmt.Sprintf("Customized %s tier health endpoint service", c.BaseTier),
 	}
 
+	// Apply feature configuration
+	projectConfig.Features.TypeScript = c.Features.TypeScript
+	projectConfig.Features.Docker = c.Features.Docker
+	projectConfig.Features.Kubernetes = c.Features.Kubernetes
+	projectConfig.Features.OpenTelemetry = c.Features.OpenTelemetry
+	projectConfig.Features.CloudEvents = c.Features.CloudEvents
+	projectConfig.Features.ServerTiming = c.Features.ServerTiming
+
+	// Apply observability configuration
+	projectConfig.Observability.Metrics.Enabled = c.Observability.MetricsEnabled
+	projectConfig.Observability.OpenTelemetry.Enabled = c.Observability.TracingEnabled
+
+	// Apply Kubernetes configuration
+	if c.Features.Kubernetes {
+		projectConfig.Kubernetes.Enabled = true
+		projectConfig.Kubernetes.Namespace = c.Kubernetes.Namespace
+		projectConfig.Kubernetes.ServiceMonitor = c.Kubernetes.ServiceMonitor
+		projectConfig.Kubernetes.Ingress.Enabled = c.Kubernetes.IngressEnabled
+	}
+
+	// Validate configuration
+	if err := projectConfig.Validate(); err != nil {
+		return fmt.Errorf("configuration validation failed: %w", err)
+	}
+
+	// Apply tier defaults
+	projectConfig.ApplyTierDefaults()
+
 	// Create generator
-	gen, err := generator.New(genConfig)
+	gen, err := generator.New(projectConfig)
 	if err != nil {
 		return err
 	}
@@ -394,7 +423,7 @@ func promptForBool(prompt string, defaultValue bool) bool {
 	if defaultValue {
 		defaultStr = "y"
 	}
-	
+
 	response := promptForInput(fmt.Sprintf("%s (y/n)", prompt), defaultStr)
 	return strings.ToLower(response) == "y" || strings.ToLower(response) == "yes"
 }
@@ -412,17 +441,17 @@ func promptForChoice(prompt string, choices []string, defaultValue string) strin
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
-	
+
 	if input == "" {
 		return defaultValue
 	}
-	
+
 	for _, choice := range choices {
 		if strings.ToLower(input) == strings.ToLower(choice) {
 			return choice
 		}
 	}
-	
+
 	return defaultValue
 }
 
@@ -446,13 +475,13 @@ func saveCustomizationProfile(c *Customization, profileName string) error {
 	if err := os.MkdirAll(profileDir, 0755); err != nil {
 		return err
 	}
-	
+
 	profilePath := filepath.Join(profileDir, profileName+".yaml")
 	data, err := yaml.Marshal(c)
 	if err != nil {
 		return err
 	}
-	
+
 	return os.WriteFile(profilePath, data, 0644)
 }
 

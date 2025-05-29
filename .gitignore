@@ -18,3 +18,30 @@ build/
 
 # VSCode settings
 .vscode/
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# IDE files
+.idea/
+*.swp
+*.swo
+
+# Temporary test files
+temp-*/
+test-output/
+*.backup.*

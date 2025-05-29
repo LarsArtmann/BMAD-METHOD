@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
+	"os"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -174,16 +176,16 @@ func DefaultTracingConfig(serviceName string) *TracingConfig {
 // InitializeTracing initializes OpenTelemetry tracing with default configuration
 func InitializeTracing(serviceName string) (*TracingProvider, error) {
 	config := DefaultTracingConfig(serviceName)
-	
+
 	// Override with environment variables if available
 	if endpoint := os.Getenv("JAEGER_ENDPOINT"); endpoint != "" {
 		config.JaegerEndpoint = endpoint
 	}
-	
+
 	if env := os.Getenv("ENVIRONMENT"); env != "" {
 		config.Environment = env
 	}
-	
+
 	if version := os.Getenv("SERVICE_VERSION"); version != "" {
 		config.ServiceVersion = version
 	}

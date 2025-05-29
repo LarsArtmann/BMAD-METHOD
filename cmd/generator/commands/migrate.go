@@ -8,9 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	"github.com/LarsArtmann/BMAD-METHOD/pkg/config"
-	"github.com/LarsArtmann/BMAD-METHOD/pkg/generator"
 )
 
 var (
@@ -34,7 +31,7 @@ Migration paths:
   basic → intermediate    Add dependency health checks
   intermediate → advanced Add full observability (OpenTelemetry, CloudEvents)
   advanced → enterprise   Add security and compliance features
-  
+
 Reverse migrations are also supported with appropriate warnings.
 
 The migration process:
@@ -261,7 +258,7 @@ func createMigrationPlan(projectInfo *ProjectInfo, targetTier string, path []str
 	for i := 0; i < len(path)-1; i++ {
 		fromTier := path[i]
 		toTier := path[i+1]
-		
+
 		ops := generateTierTransitionOperations(fromTier, toTier)
 		plan.Operations = append(plan.Operations, ops...)
 	}
@@ -395,22 +392,22 @@ func applyMigration(targetDir string, plan *MigrationPlan) error {
 // addMigrationFiles copies files from the target tier template
 func addMigrationFiles(targetDir, toTier string, files []string) error {
 	templateDir := filepath.Join("templates", toTier)
-	
+
 	for _, file := range files {
 		srcPath := filepath.Join(templateDir, file)
 		dstPath := filepath.Join(targetDir, file)
-		
+
 		// Create directory if needed
 		if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
 			return err
 		}
-		
+
 		// Copy file or directory
 		if err := copyFileOrDir(srcPath, dstPath); err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -445,7 +442,7 @@ func runMigrationCommands(targetDir string, commands []string) error {
 // updateProjectMetadata updates the project metadata file
 func updateProjectMetadata(targetDir, newTier string) error {
 	metadataPath := filepath.Join(targetDir, ".template-metadata.yaml")
-	
+
 	// Create or update metadata file
 	metadata := fmt.Sprintf(`name: %s
 tier: %s
@@ -464,19 +461,19 @@ func createProjectBackup(sourceDir, backupDir string) error {
 // showMigrationNextSteps shows next steps after migration
 func showMigrationNextSteps(fromTier, toTier string) {
 	fmt.Printf("\n📋 Next Steps:\n")
-	
+
 	switch toTier {
 	case "intermediate":
 		fmt.Printf("   1. Configure dependency health checks in internal/config/config.go\n")
 		fmt.Printf("   2. Test dependency endpoints: curl http://localhost:8080/health/dependencies\n")
 		fmt.Printf("   3. Update your monitoring to include dependency health\n")
-		
+
 	case "advanced":
 		fmt.Printf("   1. Configure OpenTelemetry endpoints in your environment\n")
 		fmt.Printf("   2. Set up CloudEvents sink for event publishing\n")
 		fmt.Printf("   3. Test observability: curl http://localhost:8080/metrics\n")
 		fmt.Printf("   4. Verify tracing is working in your observability platform\n")
-		
+
 	case "enterprise":
 		fmt.Printf("   1. Set up TLS certificates for mTLS authentication\n")
 		fmt.Printf("   2. Configure RBAC policies in configs/rbac-*.json\n")
@@ -484,7 +481,7 @@ func showMigrationNextSteps(fromTier, toTier string) {
 		fmt.Printf("   4. Configure environment-specific settings\n")
 		fmt.Printf("   5. Test security: verify client certificate authentication\n")
 	}
-	
+
 	fmt.Printf("   \n")
 	fmt.Printf("   Run 'go mod tidy' to update dependencies\n")
 	fmt.Printf("   Run 'make test' to verify the migration\n")
@@ -513,7 +510,7 @@ func copyFileOrDir(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	if srcInfo.IsDir() {
 		return copyDir(src, dst)
 	}
@@ -525,18 +522,18 @@ func copyDir(src, dst string) error {
 		if err != nil {
 			return err
 		}
-		
+
 		relPath, err := filepath.Rel(src, path)
 		if err != nil {
 			return err
 		}
-		
+
 		dstPath := filepath.Join(dst, relPath)
-		
+
 		if info.IsDir() {
 			return os.MkdirAll(dstPath, info.Mode())
 		}
-		
+
 		return copyFile(path, dstPath)
 	})
 }

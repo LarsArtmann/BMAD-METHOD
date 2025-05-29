@@ -2,6 +2,9 @@ package config
 
 import (
 	"fmt"
+	"os"
+
+	"gopkg.in/yaml.v3"
 )
 
 // TemplateTier represents the complexity tier of the generated template
@@ -85,6 +88,8 @@ type FeatureConfig struct {
 	Kubernetes    bool `yaml:"kubernetes" mapstructure:"kubernetes"`
 	TypeScript    bool `yaml:"typescript" mapstructure:"typescript"`
 	Docker        bool `yaml:"docker" mapstructure:"docker"`
+	Security      bool `yaml:"security" mapstructure:"security"`
+	Compliance    bool `yaml:"compliance" mapstructure:"compliance"`
 }
 
 // DependencyConfig configures external dependency health checks
@@ -264,6 +269,8 @@ func (c *ProjectConfig) ApplyTierDefaults() {
 		c.Features.Kubernetes = true
 		c.Features.TypeScript = true
 		c.Features.Docker = true
+		c.Features.Security = true
+		c.Features.Compliance = true
 
 		c.Dependencies.DatabaseChecks = true
 		c.Dependencies.CacheChecks = true
@@ -322,4 +329,56 @@ func (c *ProjectConfig) applyDefaultHealthProbes() {
 		FailureThreshold:    30,
 		SuccessThreshold:    1,
 	}
+}
+
+// TemplateConfig represents the configuration for a template tier
+type TemplateConfig struct {
+	Name        string            `yaml:"name"`
+	Description string            `yaml:"description"`
+	Tier        string            `yaml:"tier"`
+	Version     string            `yaml:"version"`
+	Features    map[string]bool   `yaml:"features"`
+	Metadata    map[string]string `yaml:"metadata,omitempty"`
+}
+
+// LoadTemplateConfig loads a template configuration from a YAML file
+func LoadTemplateConfig(path string) (*TemplateConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read template config: %w", err)
+	}
+
+	var config TemplateConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse template config: %w", err)
+	}
+
+	return &config, nil
+}
+
+// GeneratorConfig represents the configuration for the generator
+type GeneratorConfig struct {
+	ProjectName string            `yaml:"project_name"`
+	GoModule    string            `yaml:"go_module"`
+	Tier        string            `yaml:"tier"`
+	OutputDir   string            `yaml:"output_dir"`
+	Features    map[string]bool   `yaml:"features"`
+	Variables   map[string]string `yaml:"variables,omitempty"`
+}
+
+// Validate validates the generator configuration
+func (g *GeneratorConfig) Validate() error {
+	if g.ProjectName == "" {
+		return fmt.Errorf("project name is required")
+	}
+	if g.GoModule == "" {
+		return fmt.Errorf("go module is required")
+	}
+	if g.Tier == "" {
+		return fmt.Errorf("tier is required")
+	}
+	if g.OutputDir == "" {
+		g.OutputDir = g.ProjectName
+	}
+	return nil
 }

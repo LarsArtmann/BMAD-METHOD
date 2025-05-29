@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -90,7 +91,7 @@ func (e *EventEmitter) EmitHealthEvent(ctx context.Context, event *HealthEvent) 
 	ce.SetSource(e.config.Source)
 	ce.SetType("{{.Config.Name}}.health.check")
 	ce.SetTime(event.Timestamp)
-	
+
 	if err := ce.SetData(cloudevents.ApplicationJSON, event); err != nil {
 		return fmt.Errorf("failed to set event data: %w", err)
 	}
@@ -116,7 +117,7 @@ func (e *EventEmitter) EmitDependencyEvent(ctx context.Context, event *Dependenc
 	ce.SetSource(e.config.Source)
 	ce.SetType("{{.Config.Name}}.dependency.check")
 	ce.SetTime(event.Timestamp)
-	
+
 	if err := ce.SetData(cloudevents.ApplicationJSON, event); err != nil {
 		return fmt.Errorf("failed to set event data: %w", err)
 	}
@@ -142,7 +143,7 @@ func (e *EventEmitter) EmitServiceEvent(ctx context.Context, event *ServiceEvent
 	ce.SetSource(e.config.Source)
 	ce.SetType(fmt.Sprintf("{{.Config.Name}}.service.%s", event.EventType))
 	ce.SetTime(event.Timestamp)
-	
+
 	if err := ce.SetData(cloudevents.ApplicationJSON, event); err != nil {
 		return fmt.Errorf("failed to set event data: %w", err)
 	}
@@ -245,12 +246,12 @@ func DefaultEventsConfig(serviceName string) *EventsConfig {
 // InitializeEvents initializes CloudEvents with default configuration
 func InitializeEvents(serviceName string) (*EventEmitter, error) {
 	config := DefaultEventsConfig(serviceName)
-	
+
 	// Override with environment variables if available
 	if sinkURL := os.Getenv("CLOUDEVENTS_SINK"); sinkURL != "" {
 		config.SinkURL = sinkURL
 	}
-	
+
 	if source := os.Getenv("CLOUDEVENTS_SOURCE"); source != "" {
 		config.Source = source
 	}

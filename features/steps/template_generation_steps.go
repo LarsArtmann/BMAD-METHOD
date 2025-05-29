@@ -87,13 +87,15 @@ func RegisterTemplateGenerationSteps(ctx *godog.ScenarioContext, tgc *TemplateGe
 // Background step implementations
 
 func (tgc *TemplateGenerationContext) theCLIIsAvailable() error {
-	// Check if the CLI binary exists or can be built
-	if _, err := exec.LookPath("template-health-endpoint"); err != nil {
-		// Try to build it
-		cmd := exec.Command("go", "build", "-o", "template-health-endpoint", "./cmd/generator")
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("CLI not available and cannot be built: %w", err)
-		}
+	// Check if the CLI binary exists in bin/ directory
+	if _, err := os.Stat("../../bin/template-health-endpoint"); err == nil {
+		return nil
+	}
+
+	// Try to build it
+	cmd := exec.Command("go", "build", "-o", "../../bin/template-health-endpoint", "../../cmd/generator")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("CLI not available and cannot be built: %w", err)
 	}
 	return nil
 }
@@ -114,7 +116,8 @@ func (tgc *TemplateGenerationContext) iHaveACleanWorkingDirectory() error {
 func (tgc *TemplateGenerationContext) iRunCommand(command string) error {
 	// Replace placeholders in command
 	command = strings.ReplaceAll(command, "<output_dir>", tgc.outputDir)
-	
+	command = strings.ReplaceAll(command, "template-health-endpoint", "../../bin/template-health-endpoint")
+
 	// Parse command
 	parts := strings.Fields(command)
 	if len(parts) == 0 {
@@ -127,12 +130,12 @@ func (tgc *TemplateGenerationContext) iRunCommand(command string) error {
 
 	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
 	cmd.Dir = tgc.workingDir
-	
+
 	output, err := cmd.CombinedOutput()
 	tgc.lastCommand = cmd
 	tgc.lastOutput = string(output)
 	tgc.lastError = err
-	
+
 	if cmd.ProcessState != nil {
 		tgc.lastExitCode = cmd.ProcessState.ExitCode()
 	}
@@ -181,7 +184,7 @@ func (tgc *TemplateGenerationContext) theProjectShouldHaveCorrectStructureForTie
 	}
 
 	projectPath := tgc.generatedProjects[len(tgc.generatedProjects)-1]
-	
+
 	// Define expected files for each tier
 	expectedFiles := map[string][]string{
 		"basic": {
@@ -251,7 +254,7 @@ func (tgc *TemplateGenerationContext) theProjectShouldCompileSuccessfully() erro
 	}
 
 	projectPath := tgc.generatedProjects[len(tgc.generatedProjects)-1]
-	
+
 	// Run go mod tidy
 	cmd := exec.Command("go", "mod", "tidy")
 	cmd.Dir = projectPath
@@ -279,7 +282,7 @@ func (tgc *TemplateGenerationContext) allHealthEndpointsShouldRespondCorrectly()
 
 	projectPath := tgc.generatedProjects[len(tgc.generatedProjects)-1]
 	handlerPath := filepath.Join(projectPath, "internal/handlers/health.go")
-	
+
 	if _, err := os.Stat(handlerPath); os.IsNotExist(err) {
 		return fmt.Errorf("health handler does not exist")
 	}
@@ -303,7 +306,7 @@ func (tgc *TemplateGenerationContext) theProjectShouldIncludeTypeScriptClientSDK
 
 	projectPath := tgc.generatedProjects[len(tgc.generatedProjects)-1]
 	tsPath := filepath.Join(projectPath, "client/typescript")
-	
+
 	if _, err := os.Stat(tsPath); os.IsNotExist(err) {
 		return fmt.Errorf("TypeScript client directory does not exist")
 	}
@@ -333,7 +336,7 @@ func (tgc *TemplateGenerationContext) theProjectShouldIncludeKubernetesManifests
 
 	projectPath := tgc.generatedProjects[len(tgc.generatedProjects)-1]
 	k8sPath := filepath.Join(projectPath, "deployments/kubernetes")
-	
+
 	if _, err := os.Stat(k8sPath); os.IsNotExist(err) {
 		return fmt.Errorf("Kubernetes manifests directory does not exist")
 	}
@@ -361,7 +364,7 @@ func (tgc *TemplateGenerationContext) theGoModFileShouldContain(expectedContent 
 
 	projectPath := tgc.generatedProjects[len(tgc.generatedProjects)-1]
 	goModPath := filepath.Join(projectPath, "go.mod")
-	
+
 	content, err := os.ReadFile(goModPath)
 	if err != nil {
 		return fmt.Errorf("failed to read go.mod: %w", err)
@@ -392,7 +395,7 @@ func (tgc *TemplateGenerationContext) theProjectShouldContainTheseFiles(files *g
 	}
 
 	projectPath := tgc.generatedProjects[len(tgc.generatedProjects)-1]
-	
+
 	for _, row := range files.Rows[1:] { // Skip header
 		file := row.Cells[0].Value
 		fullPath := filepath.Join(projectPath, file)
@@ -453,7 +456,7 @@ func (tgc *TemplateGenerationContext) theTypeScriptClientShouldCompileSuccessful
 
 	projectPath := tgc.generatedProjects[len(tgc.generatedProjects)-1]
 	tsPath := filepath.Join(projectPath, "client/typescript")
-	
+
 	// Check if npm/yarn is available and try to compile
 	cmd := exec.Command("npm", "install")
 	cmd.Dir = tsPath
@@ -489,7 +492,7 @@ func (tgc *TemplateGenerationContext) theKubernetesManifestsShouldBeValidYAML() 
 
 	projectPath := tgc.generatedProjects[len(tgc.generatedProjects)-1]
 	k8sPath := filepath.Join(projectPath, "deployments/kubernetes")
-	
+
 	// Check each YAML file
 	files, err := filepath.Glob(filepath.Join(k8sPath, "*.yaml"))
 	if err != nil {
@@ -513,7 +516,7 @@ func (tgc *TemplateGenerationContext) kubectlShouldValidateTheManifestsSuccessfu
 
 	projectPath := tgc.generatedProjects[len(tgc.generatedProjects)-1]
 	k8sPath := filepath.Join(projectPath, "deployments/kubernetes")
-	
+
 	// Try kubectl validation if kubectl is available
 	cmd := exec.Command("kubectl", "apply", "--dry-run=client", "-f", k8sPath)
 	if err := cmd.Run(); err != nil {
@@ -546,11 +549,11 @@ func (tgc *TemplateGenerationContext) noFilesShouldBeCreated() error {
 	if err != nil {
 		return err
 	}
-	
+
 	if len(files) > 0 {
 		return fmt.Errorf("files were created during dry run: %v", files)
 	}
-	
+
 	return nil
 }
 

@@ -113,6 +113,30 @@ func (g *Generator) createOutputDirectory() error {
 		)
 	}
 
+	if g.config.Features.OpenTelemetry {
+		dirs = append(dirs,
+			filepath.Join(g.config.OutputDir, "internal", "observability"),
+		)
+	}
+
+	if g.config.Features.CloudEvents {
+		dirs = append(dirs,
+			filepath.Join(g.config.OutputDir, "internal", "events"),
+		)
+	}
+
+	if g.config.Features.Security {
+		dirs = append(dirs,
+			filepath.Join(g.config.OutputDir, "internal", "security"),
+		)
+	}
+
+	if g.config.Features.Compliance {
+		dirs = append(dirs,
+			filepath.Join(g.config.OutputDir, "internal", "compliance"),
+		)
+	}
+
 	if g.config.Features.Kubernetes {
 		dirs = append(dirs,
 			filepath.Join(g.config.OutputDir, "deployments", "kubernetes"),
@@ -172,6 +196,18 @@ func (g *Generator) generateGoFiles(ctx *GenerationContext) error {
 	if g.config.Features.OpenTelemetry {
 		files["internal/observability/tracing.go"] = "go-tracing"
 		files["internal/observability/metrics.go"] = "go-metrics"
+	}
+
+	// Add security files for enterprise tier
+	if g.config.Features.Security {
+		files["internal/security/mtls.go"] = "go-security-mtls"
+		files["internal/security/rbac.go"] = "go-security-rbac"
+		files["internal/security/context.go"] = "go-security-context"
+	}
+
+	// Add compliance files for enterprise tier
+	if g.config.Features.Compliance {
+		files["internal/compliance/audit.go"] = "go-compliance-audit"
 	}
 
 	if g.config.Features.CloudEvents {
@@ -735,6 +771,565 @@ type ServerTime struct {
 	UnixMilli int64     ` + "`json:\"unix_milli\"`" + `
 	ISO8601   string    ` + "`json:\"iso8601\"`" + `
 	Formatted string    ` + "`json:\"formatted\"`" + `
+}
+`,
+
+		"go-server-time-handler": `package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+	"time"
+)
+
+// ServerTimeHandler handles server time requests
+type ServerTimeHandler struct{}
+
+// NewServerTimeHandler creates a new server time handler
+func NewServerTimeHandler() *ServerTimeHandler {
+	return &ServerTimeHandler{}
+}
+
+// GetServerTime handles GET /health/time requests
+func (h *ServerTimeHandler) GetServerTime(w http.ResponseWriter, r *http.Request) {
+	now := time.Now()
+
+	response := map[string]interface{}{
+		"timestamp":    now,
+		"unix":         now.Unix(),
+		"unix_milli":   now.UnixMilli(),
+		"rfc3339":      now.Format(time.RFC3339),
+		"timezone":     now.Location().String(),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+`,
+
+		"go-tracing": `package observability
+
+// Simplified tracing for intermediate tier
+type TracingProvider struct{}
+
+func NewTracingProvider(serviceName string) *TracingProvider {
+	return &TracingProvider{}
+}
+`,
+
+		"go-metrics": `package observability
+
+// Simplified metrics for intermediate tier
+type MetricsProvider struct{}
+
+func NewMetricsProvider(serviceName string) *MetricsProvider {
+	return &MetricsProvider{}
+}
+`,
+
+		"go-events": `package events
+
+// Simplified events for intermediate tier
+type EventEmitter struct{}
+
+func NewEventEmitter(serviceName, sinkURL string) *EventEmitter {
+	return &EventEmitter{}
+}
+`,
+
+		"go-security-mtls": `package security
+
+import (
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
+)
+
+// MTLSConfig holds the configuration for mutual TLS
+type MTLSConfig struct {
+	CertFile   string
+	KeyFile    string
+	CAFile     string
+	ClientAuth tls.ClientAuthType
+}
+
+// SetupMTLS configures mutual TLS for the server
+func SetupMTLS(config MTLSConfig) (*tls.Config, error) {
+	cert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load server certificate: %w", err)
+	}
+
+	caCert, err := ioutil.ReadFile(config.CAFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+	}
+
+	caCertPool := x509.NewCertPool()
+	if !caCertPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("failed to parse CA certificate")
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   config.ClientAuth,
+		ClientCAs:    caCertPool,
+		MinVersion:   tls.VersionTLS12,
+	}
+
+	return tlsConfig, nil
+}
+
+// MTLSMiddleware validates client certificates
+func MTLSMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+			http.Error(w, "Client certificate required", http.StatusUnauthorized)
+			return
+		}
+
+		clientCert := r.TLS.PeerCertificates[0]
+		clientID := clientCert.Subject.CommonName
+		if clientID == "" {
+			http.Error(w, "Invalid client certificate", http.StatusUnauthorized)
+			return
+		}
+
+		ctx := WithClientIdentity(r.Context(), clientID)
+		r = r.WithContext(ctx)
+
+		log.Printf("mTLS: Client authenticated: %s", clientID)
+		next.ServeHTTP(w, r)
+	})
+}
+`,
+
+		"go-security-rbac": `package security
+
+import (
+	"net/http"
+	"strings"
+)
+
+// Permission represents a specific permission
+type Permission string
+
+const (
+	PermissionHealthRead     Permission = "health:read"
+	PermissionHealthWrite    Permission = "health:write"
+	PermissionMetricsRead    Permission = "metrics:read"
+	PermissionDependencyRead Permission = "dependency:read"
+	PermissionAdminAccess    Permission = "admin:access"
+)
+
+// Role represents a user role with associated permissions
+type Role struct {
+	Name        string       ` + "`json:\"name\"`" + `
+	Permissions []Permission ` + "`json:\"permissions\"`" + `
+}
+
+// User represents a user with roles
+type User struct {
+	ID    string ` + "`json:\"id\"`" + `
+	Roles []Role ` + "`json:\"roles\"`" + `
+}
+
+// RBACPolicy holds the role-based access control policy
+type RBACPolicy struct {
+	Users map[string]User ` + "`json:\"users\"`" + `
+	Roles map[string]Role ` + "`json:\"roles\"`" + `
+}
+
+// DefaultRBACPolicy returns a default RBAC policy
+func DefaultRBACPolicy() *RBACPolicy {
+	return &RBACPolicy{
+		Users: map[string]User{
+			"admin": {
+				ID: "admin",
+				Roles: []Role{
+					{Name: "admin", Permissions: []Permission{
+						PermissionHealthRead,
+						PermissionHealthWrite,
+						PermissionMetricsRead,
+						PermissionDependencyRead,
+						PermissionAdminAccess,
+					}},
+				},
+			},
+			"service": {
+				ID: "service",
+				Roles: []Role{
+					{Name: "service", Permissions: []Permission{
+						PermissionHealthRead,
+					}},
+				},
+			},
+		},
+		Roles: map[string]Role{
+			"admin": {
+				Name: "admin",
+				Permissions: []Permission{
+					PermissionHealthRead,
+					PermissionHealthWrite,
+					PermissionMetricsRead,
+					PermissionDependencyRead,
+					PermissionAdminAccess,
+				},
+			},
+			"service": {
+				Name: "service",
+				Permissions: []Permission{
+					PermissionHealthRead,
+				},
+			},
+		},
+	}
+}
+
+// RBACMiddleware validates user permissions for requests
+func RBACMiddleware(policy *RBACPolicy) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			clientID := GetClientIdentity(r.Context())
+			if clientID == "" {
+				http.Error(w, "Client identity required", http.StatusUnauthorized)
+				return
+			}
+
+			requiredPermission := getRequiredPermission(r)
+			if requiredPermission == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			if !policy.HasPermission(clientID, requiredPermission) {
+				http.Error(w, "Insufficient permissions", http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// HasPermission checks if a user has a specific permission
+func (p *RBACPolicy) HasPermission(userID string, permission Permission) bool {
+	user, exists := p.Users[userID]
+	if !exists {
+		return false
+	}
+
+	for _, role := range user.Roles {
+		for _, perm := range role.Permissions {
+			if perm == permission {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// getRequiredPermission determines the required permission based on the request
+func getRequiredPermission(r *http.Request) Permission {
+	path := strings.TrimPrefix(r.URL.Path, "/")
+	method := r.Method
+
+	switch {
+	case strings.HasPrefix(path, "health"):
+		if method == "GET" {
+			return PermissionHealthRead
+		}
+		return PermissionHealthWrite
+	case strings.HasPrefix(path, "metrics"):
+		return PermissionMetricsRead
+	case strings.HasPrefix(path, "dependencies"):
+		return PermissionDependencyRead
+	case strings.HasPrefix(path, "admin"):
+		return PermissionAdminAccess
+	default:
+		return ""
+	}
+}
+`,
+
+		"go-security-context": `package security
+
+import "context"
+
+type contextKey string
+
+const (
+	clientIdentityKey contextKey = "client_identity"
+	auditContextKey   contextKey = "audit_context"
+)
+
+// WithClientIdentity adds client identity to context
+func WithClientIdentity(ctx context.Context, clientID string) context.Context {
+	return context.WithValue(ctx, clientIdentityKey, clientID)
+}
+
+// GetClientIdentity retrieves client identity from context
+func GetClientIdentity(ctx context.Context) string {
+	if clientID, ok := ctx.Value(clientIdentityKey).(string); ok {
+		return clientID
+	}
+	return ""
+}
+
+// AuditContext holds audit information
+type AuditContext struct {
+	UserID    string
+	Action    string
+	Resource  string
+	Timestamp int64
+	RequestID string
+}
+
+// WithAuditContext adds audit context
+func WithAuditContext(ctx context.Context, auditCtx *AuditContext) context.Context {
+	return context.WithValue(ctx, auditContextKey, auditCtx)
+}
+
+// GetAuditContext retrieves audit context
+func GetAuditContext(ctx context.Context) *AuditContext {
+	if auditCtx, ok := ctx.Value(auditContextKey).(*AuditContext); ok {
+		return auditCtx
+	}
+	return nil
+}
+`,
+
+		"go-compliance-audit": `package compliance
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"time"
+
+	"{{.Config.GoModule}}/internal/security"
+)
+
+// AuditEvent represents an audit log event
+type AuditEvent struct {
+	Timestamp   time.Time ` + "`json:\"timestamp\"`" + `
+	EventID     string    ` + "`json:\"event_id\"`" + `
+	UserID      string    ` + "`json:\"user_id\"`" + `
+	Action      string    ` + "`json:\"action\"`" + `
+	Resource    string    ` + "`json:\"resource\"`" + `
+	Method      string    ` + "`json:\"method\"`" + `
+	Path        string    ` + "`json:\"path\"`" + `
+	StatusCode  int       ` + "`json:\"status_code\"`" + `
+	Duration    int64     ` + "`json:\"duration_ms\"`" + `
+	RequestID   string    ` + "`json:\"request_id\"`" + `
+	ClientIP    string    ` + "`json:\"client_ip\"`" + `
+	UserAgent   string    ` + "`json:\"user_agent\"`" + `
+	Success     bool      ` + "`json:\"success\"`" + `
+	ErrorMsg    string    ` + "`json:\"error_message,omitempty\"`" + `
+}
+
+// AuditLogger handles audit logging
+type AuditLogger struct {
+	logger   *log.Logger
+	file     *os.File
+	enabled  bool
+}
+
+// NewAuditLogger creates a new audit logger
+func NewAuditLogger(logFile string, enabled bool) (*AuditLogger, error) {
+	if !enabled {
+		return &AuditLogger{enabled: false}, nil
+	}
+
+	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open audit log file: %w", err)
+	}
+
+	logger := log.New(file, "", 0)
+
+	return &AuditLogger{
+		logger:   logger,
+		file:     file,
+		enabled:  true,
+	}, nil
+}
+
+// LogEvent logs an audit event
+func (a *AuditLogger) LogEvent(event AuditEvent) error {
+	if !a.enabled {
+		return nil
+	}
+
+	eventJSON, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal audit event: %w", err)
+	}
+
+	a.logger.Println(string(eventJSON))
+	return nil
+}
+
+// LogHTTPRequest logs an HTTP request audit event
+func (a *AuditLogger) LogHTTPRequest(r *http.Request, statusCode int, duration time.Duration, err error) {
+	if !a.enabled {
+		return
+	}
+
+	userID := security.GetClientIdentity(r.Context())
+	if userID == "" {
+		userID = "anonymous"
+	}
+
+	event := AuditEvent{
+		Timestamp:  time.Now().UTC(),
+		EventID:    fmt.Sprintf("audit_%d", time.Now().UnixNano()),
+		UserID:     userID,
+		Action:     "http_request",
+		Resource:   r.URL.Path,
+		Method:     r.Method,
+		Path:       r.URL.Path,
+		StatusCode: statusCode,
+		Duration:   duration.Milliseconds(),
+		RequestID:  r.Header.Get("X-Request-ID"),
+		ClientIP:   r.RemoteAddr,
+		UserAgent:  r.UserAgent(),
+		Success:    statusCode < 400,
+	}
+
+	if err != nil {
+		event.ErrorMsg = err.Error()
+	}
+
+	if logErr := a.LogEvent(event); logErr != nil {
+		log.Printf("Failed to log audit event: %v", logErr)
+	}
+}
+
+// AuditMiddleware creates middleware for HTTP request auditing
+func AuditMiddleware(auditLogger *AuditLogger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+
+			wrapped := &responseWriter{ResponseWriter: w, statusCode: 200}
+
+			next.ServeHTTP(wrapped, r)
+
+			duration := time.Since(start)
+			auditLogger.LogHTTPRequest(r, wrapped.statusCode, duration, nil)
+		})
+	}
+}
+
+// responseWriter wraps http.ResponseWriter to capture status code
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+// Close closes the audit logger
+func (a *AuditLogger) Close() error {
+	if a.file != nil {
+		return a.file.Close()
+	}
+	return nil
+}
+`,
+
+		"go-dependencies-handler": `package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+	"time"
+)
+
+// DependenciesHandler handles dependency health checks
+type DependenciesHandler struct{}
+
+// NewDependenciesHandler creates a new dependencies handler
+func NewDependenciesHandler() *DependenciesHandler {
+	return &DependenciesHandler{}
+}
+
+// DependencyStatus represents the status of a dependency
+type DependencyStatus struct {
+	Name      string        ` + "`json:\"name\"`" + `
+	Status    string        ` + "`json:\"status\"`" + `
+	Latency   time.Duration ` + "`json:\"latency\"`" + `
+	Error     string        ` + "`json:\"error,omitempty\"`" + `
+	Timestamp time.Time     ` + "`json:\"timestamp\"`" + `
+}
+
+// DependenciesResponse represents the dependencies health response
+type DependenciesResponse struct {
+	Status       string              ` + "`json:\"status\"`" + `
+	Dependencies []DependencyStatus  ` + "`json:\"dependencies\"`" + `
+	Timestamp    time.Time           ` + "`json:\"timestamp\"`" + `
+}
+
+// CheckDependencies handles GET /health/dependencies requests
+func (h *DependenciesHandler) CheckDependencies(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Simulate dependency checks
+	dependencies := []DependencyStatus{
+		{
+			Name:      "database",
+			Status:    "healthy",
+			Latency:   5 * time.Millisecond,
+			Timestamp: time.Now(),
+		},
+		{
+			Name:      "cache",
+			Status:    "healthy",
+			Latency:   2 * time.Millisecond,
+			Timestamp: time.Now(),
+		},
+	}
+
+	// Determine overall status
+	overallStatus := "healthy"
+	for _, dep := range dependencies {
+		if dep.Status != "healthy" {
+			overallStatus = "degraded"
+			break
+		}
+	}
+
+	response := DependenciesResponse{
+		Status:       overallStatus,
+		Dependencies: dependencies,
+		Timestamp:    time.Now(),
+	}
+
+	if overallStatus == "healthy" {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 `,
 
@@ -1311,6 +1906,45 @@ data:
   PORT: "8080"
   VERSION: "{{.Config.Version}}"
   SERVICE_NAME: "{{.Config.Name}}"
+`,
+
+		"k8s-servicemonitor": `apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{.Config.Name}}
+  labels:
+    app: {{.Config.Name}}
+spec:
+  selector:
+    matchLabels:
+      app: {{.Config.Name}}
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+`,
+
+		"k8s-ingress": `apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{.Config.Name}}
+  labels:
+    app: {{.Config.Name}}
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: {{.Config.Name}}.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{.Config.Name}}
+            port:
+              number: 80
 `,
 
 		"docker-compose": `version: '3.8'
