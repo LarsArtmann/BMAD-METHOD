@@ -1,0 +1,10 @@
+name: intermediate
+description: Intermediate tier health endpoint template
+tier: intermediate
+features:
+  kubernetes: true
+  typescript: true
+  docker: true
+  opentelemetry: true
+  cloudevents: false
+version: "1.0.0"

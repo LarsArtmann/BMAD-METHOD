@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -48,7 +47,7 @@ func TestEndToEndGeneration(t *testing.T) {
 		Tier:        config.TierBasic,
 		Version:     "1.0.0",
 		OutputDir:   outputDir,
-		Features: config.FeatureFlags{
+		Features: config.FeatureConfig{
 			Kubernetes: true,
 		},
 	}
@@ -228,7 +227,7 @@ func testServerTimeEndpoint(url string) error {
 
 func TestCLICommands(t *testing.T) {
 	// Test CLI help command
-	cmd := exec.Command("./bin/template-health-endpoint", "--help")
+	cmd := exec.Command("../bin/template-health-endpoint", "--help")
 	output, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("CLI help command failed: %v", err)
@@ -245,9 +244,16 @@ func TestCLICommands(t *testing.T) {
 }
 
 func TestValidateCommand(t *testing.T) {
+	// Get current working directory and build absolute path
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get working directory: %v", err)
+	}
+
 	// Test TypeSpec validation
 	cmd := exec.Command("./bin/template-health-endpoint", "validate", "--verbose")
-	err := cmd.Run()
+	cmd.Dir = wd + "/.."
+	err = cmd.Run()
 	if err != nil {
 		t.Fatalf("TypeSpec validation failed: %v", err)
 	}
@@ -255,28 +261,28 @@ func TestValidateCommand(t *testing.T) {
 
 func TestGenerateCommandDryRun(t *testing.T) {
 	// Test dry run generation
-	cmd := exec.Command("./bin/template-health-endpoint", "generate", 
-		"--name", "dry-run-test", 
-		"--tier", "basic", 
+	cmd := exec.Command("../bin/template-health-endpoint", "generate",
+		"--name", "dry-run-test",
+		"--tier", "basic",
 		"--module", "github.com/example/dry-run-test",
 		"--dry-run")
-	
+
 	output, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("Dry run generation failed: %v", err)
 	}
 
 	dryRunOutput := string(output)
-	if !contains(dryRunOutput, "dry run") || !contains(dryRunOutput, "would generate") {
+	if !contains(dryRunOutput, "Dry run mode") || !contains(dryRunOutput, "would be generated") {
 		t.Error("Dry run should indicate it's a simulation")
 	}
 }
 
 // Helper function to check if a string contains a substring
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && 
-		   (s == substr || 
-		    s[:len(substr)] == substr || 
+	return len(s) >= len(substr) &&
+		   (s == substr ||
+		    s[:len(substr)] == substr ||
 		    s[len(s)-len(substr):] == substr ||
 		    containsSubstring(s, substr))
 }

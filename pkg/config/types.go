@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"time"
 )
 
 // TemplateTier represents the complexity tier of the generated template
@@ -11,13 +10,13 @@ type TemplateTier string
 const (
 	// TierBasic provides simple health endpoints (5 min deployment)
 	TierBasic TemplateTier = "basic"
-	
+
 	// TierIntermediate adds dependency checks and basic observability (15 min deployment)
 	TierIntermediate TemplateTier = "intermediate"
-	
+
 	// TierAdvanced includes full observability and CloudEvents (30 min deployment)
 	TierAdvanced TemplateTier = "advanced"
-	
+
 	// TierEnterprise provides compliance and enterprise features (45 min deployment)
 	TierEnterprise TemplateTier = "enterprise"
 )
@@ -60,20 +59,20 @@ type ProjectConfig struct {
 	Version     string `yaml:"version" mapstructure:"version"`
 	Description string `yaml:"description" mapstructure:"description"`
 	GoModule    string `yaml:"go_module" mapstructure:"go_module"`
-	
+
 	// Template configuration
 	Tier     TemplateTier `yaml:"tier" mapstructure:"tier"`
 	OutputDir string      `yaml:"output_dir" mapstructure:"output_dir"`
-	
+
 	// Feature flags
 	Features FeatureConfig `yaml:"features" mapstructure:"features"`
-	
+
 	// Dependencies configuration
 	Dependencies DependencyConfig `yaml:"dependencies" mapstructure:"dependencies"`
-	
+
 	// Kubernetes configuration
 	Kubernetes KubernetesConfig `yaml:"kubernetes" mapstructure:"kubernetes"`
-	
+
 	// Observability configuration
 	Observability ObservabilityConfig `yaml:"observability" mapstructure:"observability"`
 }
@@ -184,23 +183,23 @@ func (c *ProjectConfig) Validate() error {
 	if c.Name == "" {
 		return fmt.Errorf("project name is required")
 	}
-	
+
 	if !c.Tier.IsValid() {
 		return fmt.Errorf("invalid tier: %s (must be one of: basic, intermediate, advanced, enterprise)", c.Tier)
 	}
-	
+
 	if c.GoModule == "" {
 		return fmt.Errorf("go module path is required")
 	}
-	
+
 	if c.OutputDir == "" {
 		c.OutputDir = c.Name
 	}
-	
+
 	if c.Version == "" {
 		c.Version = "1.0.0"
 	}
-	
+
 	return nil
 }
 
@@ -214,12 +213,12 @@ func (c *ProjectConfig) ApplyTierDefaults() {
 		c.Features.Kubernetes = true
 		c.Features.TypeScript = true
 		c.Features.Docker = true
-		
+
 		c.Dependencies.DatabaseChecks = false
 		c.Dependencies.CacheChecks = false
 		c.Dependencies.FilesystemChecks = true
 		c.Dependencies.MemoryChecks = true
-		
+
 	case TierIntermediate:
 		c.Features.OpenTelemetry = true
 		c.Features.ServerTiming = false
@@ -227,16 +226,16 @@ func (c *ProjectConfig) ApplyTierDefaults() {
 		c.Features.Kubernetes = true
 		c.Features.TypeScript = true
 		c.Features.Docker = true
-		
+
 		c.Dependencies.DatabaseChecks = true
 		c.Dependencies.CacheChecks = true
 		c.Dependencies.FilesystemChecks = true
 		c.Dependencies.MemoryChecks = true
-		
+
 		c.Observability.OpenTelemetry.Enabled = true
 		c.Observability.OpenTelemetry.Tracing = true
 		c.Observability.OpenTelemetry.Metrics = true
-		
+
 	case TierAdvanced:
 		c.Features.OpenTelemetry = true
 		c.Features.ServerTiming = true
@@ -244,20 +243,20 @@ func (c *ProjectConfig) ApplyTierDefaults() {
 		c.Features.Kubernetes = true
 		c.Features.TypeScript = true
 		c.Features.Docker = true
-		
+
 		c.Dependencies.DatabaseChecks = true
 		c.Dependencies.CacheChecks = true
 		c.Dependencies.FilesystemChecks = true
 		c.Dependencies.MemoryChecks = true
-		
+
 		c.Observability.OpenTelemetry.Enabled = true
 		c.Observability.OpenTelemetry.Tracing = true
 		c.Observability.OpenTelemetry.Metrics = true
 		c.Observability.OpenTelemetry.Logging = true
-		
+
 		c.Observability.ServerTiming.Enabled = true
 		c.Observability.CloudEvents.Enabled = true
-		
+
 	case TierEnterprise:
 		c.Features.OpenTelemetry = true
 		c.Features.ServerTiming = true
@@ -265,27 +264,27 @@ func (c *ProjectConfig) ApplyTierDefaults() {
 		c.Features.Kubernetes = true
 		c.Features.TypeScript = true
 		c.Features.Docker = true
-		
+
 		c.Dependencies.DatabaseChecks = true
 		c.Dependencies.CacheChecks = true
 		c.Dependencies.FilesystemChecks = true
 		c.Dependencies.MemoryChecks = true
-		
+
 		c.Observability.OpenTelemetry.Enabled = true
 		c.Observability.OpenTelemetry.Tracing = true
 		c.Observability.OpenTelemetry.Metrics = true
 		c.Observability.OpenTelemetry.Logging = true
-		
+
 		c.Observability.ServerTiming.Enabled = true
 		c.Observability.CloudEvents.Enabled = true
 		c.Observability.Metrics.Enabled = true
 		c.Observability.Metrics.Prometheus = true
-		
+
 		c.Kubernetes.Enabled = true
 		c.Kubernetes.ServiceMonitor = true
 		c.Kubernetes.Ingress.Enabled = true
 	}
-	
+
 	// Apply default Kubernetes health probe configurations
 	if c.Features.Kubernetes {
 		c.applyDefaultHealthProbes()
@@ -303,7 +302,7 @@ func (c *ProjectConfig) applyDefaultHealthProbes() {
 		FailureThreshold:    3,
 		SuccessThreshold:    1,
 	}
-	
+
 	c.Kubernetes.HealthProbes.ReadinessProbe = ProbeConfig{
 		Enabled:             true,
 		Path:                "/health/ready",
@@ -313,7 +312,7 @@ func (c *ProjectConfig) applyDefaultHealthProbes() {
 		FailureThreshold:    3,
 		SuccessThreshold:    1,
 	}
-	
+
 	c.Kubernetes.HealthProbes.StartupProbe = ProbeConfig{
 		Enabled:             true,
 		Path:                "/health/startup",

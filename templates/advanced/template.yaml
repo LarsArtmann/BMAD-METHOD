@@ -1,0 +1,10 @@
+name: advanced
+description: Advanced tier health endpoint template
+tier: advanced
+features:
+  kubernetes: true
+  typescript: true
+  docker: true
+  opentelemetry: true
+  cloudevents: true
+version: "1.0.0"

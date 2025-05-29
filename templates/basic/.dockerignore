@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+README*
+
+# Build artifacts
+bin/
+dist/
+build/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment files
+.env*
+
+# Node modules
+node_modules/
+
+# Test files
+*_test.go
+*.test
+
+# Coverage
+*.out
+coverage/

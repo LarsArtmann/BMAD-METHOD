@@ -1,0 +1,10 @@
+name: enterprise
+description: Enterprise tier health endpoint template
+tier: enterprise
+features:
+  kubernetes: true
+  typescript: true
+  docker: true
+  opentelemetry: true
+  cloudevents: true
+version: "1.0.0"

@@ -1,0 +1,10 @@
+name: basic
+description: Basic tier health endpoint template
+tier: basic
+features:
+  kubernetes: true
+  typescript: true
+  docker: true
+  opentelemetry: false
+  cloudevents: false
+version: "1.0.0"

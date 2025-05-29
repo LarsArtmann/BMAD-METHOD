@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -41,7 +40,7 @@ The generator creates a production-ready health endpoint implementation includin
 
 Available tiers:
   basic        - Simple health endpoints (~5 min deployment)
-  intermediate - Production-ready with dependency checks (~15 min deployment)  
+  intermediate - Production-ready with dependency checks (~15 min deployment)
   advanced     - Full observability with OpenTelemetry (~30 min deployment)
   enterprise   - Enterprise-grade with compliance features (~45 min deployment)
 
@@ -67,7 +66,7 @@ func init() {
 	// Required flags
 	generateCmd.Flags().StringVarP(&projectName, "name", "n", "", "project name (required)")
 	generateCmd.Flags().StringVarP(&tier, "tier", "t", "basic", "template tier (basic|intermediate|advanced|enterprise)")
-	
+
 	// Optional flags
 	generateCmd.Flags().StringVarP(&outputDir, "output", "o", "", "output directory (default: project name)")
 	generateCmd.Flags().StringVarP(&goModule, "module", "m", "", "Go module path (default: github.com/example/{name})")
@@ -116,7 +115,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 	// Generate the project
 	fmt.Printf("🚀 Generating %s tier health endpoint project: %s\n", cfg.Tier, cfg.Name)
-	
+
 	if err := gen.Generate(); err != nil {
 		return fmt.Errorf("generation failed: %w", err)
 	}
@@ -134,7 +133,7 @@ func loadConfiguration() (*config.ProjectConfig, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
-		
+
 		if err := yaml.Unmarshal(data, &cfg); err != nil {
 			return nil, fmt.Errorf("failed to parse config file: %w", err)
 		}
@@ -144,17 +143,17 @@ func loadConfiguration() (*config.ProjectConfig, error) {
 	if projectName != "" {
 		cfg.Name = projectName
 	}
-	
+
 	if tier != "" {
 		cfg.Tier = config.TemplateTier(tier)
 	}
-	
+
 	if outputDir != "" {
 		cfg.OutputDir = outputDir
 	} else if cfg.OutputDir == "" {
 		cfg.OutputDir = cfg.Name
 	}
-	
+
 	if goModule != "" {
 		cfg.GoModule = goModule
 	} else if cfg.GoModule == "" {
@@ -193,7 +192,7 @@ func showConfigurationSummary(cfg *config.ProjectConfig) error {
 	fmt.Printf("  Description: %s\n", cfg.Tier.Description())
 	fmt.Printf("  Go Module: %s\n", cfg.GoModule)
 	fmt.Printf("  Output Directory: %s\n", cfg.OutputDir)
-	
+
 	fmt.Println("\n🎛️  Features:")
 	fmt.Printf("  OpenTelemetry: %v\n", cfg.Features.OpenTelemetry)
 	fmt.Printf("  Server Timing: %v\n", cfg.Features.ServerTiming)
@@ -201,7 +200,7 @@ func showConfigurationSummary(cfg *config.ProjectConfig) error {
 	fmt.Printf("  Kubernetes: %v\n", cfg.Features.Kubernetes)
 	fmt.Printf("  TypeScript: %v\n", cfg.Features.TypeScript)
 	fmt.Printf("  Docker: %v\n", cfg.Features.Docker)
-	
+
 	if cfg.Features.Kubernetes {
 		fmt.Println("\n☸️  Kubernetes Configuration:")
 		fmt.Printf("  Service Monitor: %v\n", cfg.Kubernetes.ServiceMonitor)
@@ -211,13 +210,13 @@ func showConfigurationSummary(cfg *config.ProjectConfig) error {
 			cfg.Kubernetes.HealthProbes.ReadinessProbe.Enabled,
 			cfg.Kubernetes.HealthProbes.StartupProbe.Enabled)
 	}
-	
+
 	return nil
 }
 
 func showGenerationPlan(cfg *config.ProjectConfig) error {
 	fmt.Println("\n📁 Files that would be generated:")
-	
+
 	// Core files
 	files := []string{
 		"README.md",
@@ -228,7 +227,7 @@ func showGenerationPlan(cfg *config.ProjectConfig) error {
 		".gitignore",
 		"Makefile",
 	}
-	
+
 	// Go source files
 	goFiles := []string{
 		"cmd/server/main.go",
@@ -238,7 +237,7 @@ func showGenerationPlan(cfg *config.ProjectConfig) error {
 		"internal/server/server.go",
 		"internal/config/config.go",
 	}
-	
+
 	// TypeScript files (if enabled)
 	var tsFiles []string
 	if cfg.Features.TypeScript {
@@ -249,7 +248,7 @@ func showGenerationPlan(cfg *config.ProjectConfig) error {
 			"client/typescript/tsconfig.json",
 		}
 	}
-	
+
 	// Kubernetes files (if enabled)
 	var k8sFiles []string
 	if cfg.Features.Kubernetes {
@@ -258,31 +257,31 @@ func showGenerationPlan(cfg *config.ProjectConfig) error {
 			"deployments/kubernetes/service.yaml",
 			"deployments/kubernetes/configmap.yaml",
 		}
-		
+
 		if cfg.Kubernetes.ServiceMonitor {
 			k8sFiles = append(k8sFiles, "deployments/kubernetes/servicemonitor.yaml")
 		}
-		
+
 		if cfg.Kubernetes.Ingress.Enabled {
 			k8sFiles = append(k8sFiles, "deployments/kubernetes/ingress.yaml")
 		}
 	}
-	
+
 	// Print file lists
 	printFileList("Core Files", files)
 	printFileList("Go Source Files", goFiles)
-	
+
 	if len(tsFiles) > 0 {
 		printFileList("TypeScript Client Files", tsFiles)
 	}
-	
+
 	if len(k8sFiles) > 0 {
 		printFileList("Kubernetes Manifests", k8sFiles)
 	}
-	
+
 	// Show estimated deployment time
 	fmt.Printf("\n⏱️  Estimated deployment time: %s\n", cfg.Tier.Description())
-	
+
 	return nil
 }
 
@@ -296,24 +295,24 @@ func printFileList(title string, files []string) {
 func showSuccessMessage(cfg *config.ProjectConfig) error {
 	fmt.Printf("\n✅ Successfully generated %s tier health endpoint project!\n", cfg.Tier)
 	fmt.Printf("\n📁 Project created in: %s\n", cfg.OutputDir)
-	
+
 	fmt.Println("\n🚀 Next steps:")
 	fmt.Printf("  1. cd %s\n", cfg.OutputDir)
 	fmt.Println("  2. go mod tidy")
 	fmt.Println("  3. go run cmd/server/main.go")
 	fmt.Println("  4. curl http://localhost:8080/health")
-	
+
 	if cfg.Features.TypeScript {
 		fmt.Println("\n📦 TypeScript client:")
 		fmt.Printf("  cd %s/client/typescript && npm install\n", cfg.OutputDir)
 	}
-	
+
 	if cfg.Features.Kubernetes {
 		fmt.Println("\n☸️  Kubernetes deployment:")
 		fmt.Printf("  kubectl apply -f %s/deployments/kubernetes/\n", cfg.OutputDir)
 	}
-	
+
 	fmt.Printf("\n📚 Documentation: %s/README.md\n", cfg.OutputDir)
-	
+
 	return nil
 }
