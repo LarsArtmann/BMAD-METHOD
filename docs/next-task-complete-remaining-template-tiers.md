@@ -4,9 +4,9 @@
 
 **Objective**: Complete the template-health-endpoint project by implementing the remaining template tiers (Intermediate, Advanced, Enterprise) and adding advanced CLI functionality (update, migrate, customize commands) to fulfill all GitHub issue #127 requirements.
 
-**Priority**: **CRITICAL** - Required to complete the project and fulfill original requirements  
-**Estimated Effort**: 4-6 hours  
-**Impact**: **MAXIMUM** - Takes project from 60% to 100% complete  
+**Priority**: **CRITICAL** - Required to complete the project and fulfill original requirements
+**Estimated Effort**: 4-6 hours
+**Impact**: **MAXIMUM** - Takes project from 60% to 100% complete
 **Context**: This is the final task to complete the template-health-endpoint project
 
 ## 📋 **Current State Analysis**
@@ -39,7 +39,7 @@ Based on the current chat history and repository state:
 #### **Task 1.1: Intermediate Template Tier**
 **Objective**: Create production-ready template with dependency health checks
 
-**Current State**: Only basic tier exists in `/templates/basic/`  
+**Current State**: Only basic tier exists in `/templates/basic/`
 **Target**: Create `/templates/intermediate/` with enhanced features
 
 **Implementation Steps**:
@@ -207,36 +207,36 @@ func runUpdateProject(cmd *cobra.Command, args []string) error {
     templateVersion, _ := cmd.Flags().GetString("template-version")
     selective, _ := cmd.Flags().GetStringSlice("selective")
     dryRun, _ := cmd.Flags().GetBool("dry-run")
-    
+
     // 1. Detect current project template version
     currentVersion, err := detectProjectVersion(projectPath)
     if err != nil {
         return fmt.Errorf("failed to detect project version: %w", err)
     }
-    
+
     // 2. Compare with target template version
     changes, err := compareTemplateVersions(currentVersion, templateVersion)
     if err != nil {
         return fmt.Errorf("failed to compare versions: %w", err)
     }
-    
+
     // 3. Show diff of changes
     fmt.Printf("🔍 Changes from %s to %s:\n", currentVersion, templateVersion)
     for _, change := range changes {
         fmt.Printf("  %s %s\n", change.Type, change.File)
     }
-    
+
     if dryRun {
         fmt.Println("🔍 Dry run mode - no changes applied")
         return nil
     }
-    
+
     // 4. Apply updates with user confirmation
     if !confirmUpdate() {
         fmt.Println("❌ Update cancelled")
         return nil
     }
-    
+
     return applyUpdates(projectPath, changes, selective)
 }
 ```
@@ -271,7 +271,7 @@ func runMigrateProject(cmd *cobra.Command, args []string) error {
     fromTier, _ := cmd.Flags().GetString("from")
     toTier, _ := cmd.Flags().GetString("to")
     dryRun, _ := cmd.Flags().GetBool("dry-run")
-    
+
     // 1. Detect current project tier
     if fromTier == "" {
         detectedTier, err := detectProjectTier(projectPath)
@@ -280,29 +280,29 @@ func runMigrateProject(cmd *cobra.Command, args []string) error {
         }
         fromTier = detectedTier
     }
-    
+
     // 2. Validate migration path
     if !isValidMigrationPath(fromTier, toTier) {
         return fmt.Errorf("invalid migration path: %s -> %s", fromTier, toTier)
     }
-    
+
     // 3. Plan migration steps
     migrationPlan, err := createMigrationPlan(fromTier, toTier)
     if err != nil {
         return fmt.Errorf("failed to create migration plan: %w", err)
     }
-    
+
     // 4. Show migration plan
     fmt.Printf("🚀 Migration plan: %s -> %s\n", fromTier, toTier)
     for _, step := range migrationPlan.Steps {
         fmt.Printf("  %s %s\n", step.Action, step.Description)
     }
-    
+
     if dryRun {
         fmt.Println("🔍 Dry run mode - no changes applied")
         return nil
     }
-    
+
     // 5. Execute migration
     return executeMigration(projectPath, migrationPlan)
 }
@@ -338,13 +338,13 @@ func runCustomizeTemplate(cmd *cobra.Command, args []string) error {
     interactive, _ := cmd.Flags().GetBool("interactive")
     configFile, _ := cmd.Flags().GetString("config")
     saveProfile, _ := cmd.Flags().GetString("save-profile")
-    
+
     // 1. Load template
     template, err := loadTemplate(tier)
     if err != nil {
         return fmt.Errorf("failed to load template: %w", err)
     }
-    
+
     // 2. Load customization config
     var customization *TemplateCustomization
     if configFile != "" {
@@ -358,13 +358,13 @@ func runCustomizeTemplate(cmd *cobra.Command, args []string) error {
             return fmt.Errorf("interactive customization failed: %w", err)
         }
     }
-    
+
     // 3. Apply customizations
     customizedTemplate, err := applyCustomizations(template, customization)
     if err != nil {
         return fmt.Errorf("failed to apply customizations: %w", err)
     }
-    
+
     // 4. Save profile if requested
     if saveProfile != "" {
         if err := saveCustomizationProfile(saveProfile, customization); err != nil {
@@ -372,7 +372,7 @@ func runCustomizeTemplate(cmd *cobra.Command, args []string) error {
         }
         fmt.Printf("✅ Customization profile saved: %s\n", saveProfile)
     }
-    
+
     // 5. Generate customized project
     return generateFromCustomizedTemplate(customizedTemplate)
 }
@@ -390,7 +390,178 @@ template-health-endpoint customize --tier advanced --config custom.yaml
 template-health-endpoint customize --tier enterprise --interactive --save-profile my-org
 ```
 
-### **Phase 3: Final Validation and Testing (1 hour)**
+### **Phase 3: Comprehensive BDD Testing (2 hours)**
+
+#### **Task 3.1: BDD Framework Setup**
+**Objective**: Implement Behavior-Driven Development testing for comprehensive user scenario validation
+
+**Implementation Steps**:
+1. **Install BDD Dependencies**:
+   ```bash
+   go get github.com/cucumber/godog
+   go get github.com/stretchr/testify/assert
+   go get github.com/stretchr/testify/require
+   ```
+
+2. **Create BDD Test Structure**:
+   ```
+   features/
+   ├── template_generation.feature      # Core generation scenarios
+   ├── static_templates.feature         # Static template usage
+   ├── project_migration.feature        # Tier migration scenarios
+   ├── error_handling.feature           # Error conditions
+   ├── performance.feature              # Performance requirements
+   ├── kubernetes_integration.feature   # K8s integration
+   ├── steps/
+   │   ├── common_steps.go             # Shared step definitions
+   │   ├── generation_steps.go         # Generation-specific steps
+   │   ├── migration_steps.go          # Migration-specific steps
+   │   └── validation_steps.go         # Validation steps
+   ├── support/
+   │   ├── test_context.go             # Test context management
+   │   ├── test_data.go                # Test data helpers
+   │   └── cleanup.go                  # Cleanup utilities
+   └── main_test.go                    # BDD test runner
+   ```
+
+3. **Core BDD Scenarios**:
+   ```gherkin
+   # features/template_generation.feature
+   Feature: Template Generation
+     As a developer
+     I want to generate projects from different template tiers
+     So that I can choose the right complexity level for my needs
+
+     Scenario Outline: Generate project from different tiers
+       When I run "template-health-endpoint generate --name <project_name> --tier <tier> --module github.com/test/<project_name>"
+       Then a new project should be created in "./<project_name>"
+       And the project should compile successfully
+       And the project should have all required health endpoints
+       And the health endpoints should respond correctly
+       And the project should have <tier> tier features
+
+       Examples:
+         | project_name | tier         |
+         | basic-test   | basic        |
+         | inter-test   | intermediate |
+         | adv-test     | advanced     |
+         | ent-test     | enterprise   |
+   ```
+
+4. **Migration BDD Scenarios**:
+   ```gherkin
+   # features/project_migration.feature
+   Feature: Project Migration Between Tiers
+     As a developer
+     I want to migrate my project between template tiers
+     So that I can add more features as my service evolves
+
+     Scenario: Migrate from basic to intermediate
+       Given I have a basic tier project called "migration-test"
+       When I run "template-health-endpoint migrate --project ./migration-test --to intermediate"
+       Then the migration should succeed
+       And the project should be at intermediate tier
+       And dependency health check endpoints should be available
+       And basic OpenTelemetry should be configured
+   ```
+
+5. **Error Handling BDD Scenarios**:
+   ```gherkin
+   # features/error_handling.feature
+   Feature: Error Handling and Validation
+     As a developer
+     I want clear error messages when something goes wrong
+     So that I can quickly understand and fix issues
+
+     Scenario: Generate with invalid tier
+       When I run "template-health-endpoint generate --name test --tier invalid --module github.com/test/test"
+       Then the command should fail with exit code 1
+       And the error message should contain "invalid tier 'invalid'"
+       And the error message should list available tiers
+   ```
+
+6. **Performance BDD Scenarios**:
+   ```gherkin
+   # features/performance.feature
+   Feature: Performance Requirements
+     As a developer
+     I want the CLI to perform efficiently
+     So that it doesn't slow down my development workflow
+
+     Scenario: Generated service handles concurrent requests
+       Given I have a running basic tier service
+       When I send 50 concurrent requests to "/health"
+       Then all requests should return status 200
+       And the average response time should be less than 100ms
+   ```
+
+#### **Task 3.2: BDD Step Definitions**
+**Objective**: Implement Go step definitions that map Gherkin scenarios to actual test code
+
+**Implementation**:
+```go
+// features/steps/common_steps.go
+func InitializeCommonSteps(ctx *godog.ScenarioContext) {
+    ctx.Given(`^I have the template-health-endpoint CLI installed$`, iHaveTheCLIInstalled)
+    ctx.When(`^I run "([^"]*)"$`, iRunCommand)
+    ctx.Then(`^a new project should be created in "([^"]*)"$`, aNewProjectShouldBeCreated)
+    ctx.Then(`^the project should compile successfully$`, theProjectShouldCompile)
+    ctx.Then(`^the health endpoints should respond correctly$`, theHealthEndpointsShouldRespond)
+}
+
+func iRunCommand(ctx context.Context, command string) error {
+    testCtx := getTestContext(ctx)
+    parts := strings.Fields(command)
+    cmd := exec.Command(parts[0], parts[1:]...)
+    output, err := cmd.CombinedOutput()
+
+    testCtx.LastCommand = cmd
+    testCtx.LastOutput = string(output)
+    testCtx.LastError = err
+    testCtx.LastExitCode = cmd.ProcessState.ExitCode()
+
+    return nil
+}
+```
+
+#### **Task 3.3: CI/CD BDD Integration**
+**Objective**: Integrate BDD tests into CI/CD pipeline
+
+**Implementation**:
+```yaml
+# .github/workflows/bdd-tests.yml
+name: BDD Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  bdd-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.21
+    - name: Install BDD dependencies
+      run: go get github.com/cucumber/godog
+    - name: Build CLI
+      run: go build -o bin/template-health-endpoint cmd/generator/main.go
+    - name: Run BDD tests
+      run: |
+        cd features
+        go test -v -godog.format=pretty
+    - name: Generate BDD report
+      run: |
+        cd features
+        go test -v -godog.format=cucumber > ../bdd-results.json
+```
+
+### **Phase 4: Final Validation and Testing (1 hour)**
 
 #### **Task 3.1: Comprehensive Testing**
 **Objective**: Ensure all template tiers and CLI commands work correctly
@@ -405,45 +576,45 @@ echo "🧪 Testing Complete Template Health Endpoint System"
 # Test all template tiers
 for tier in basic intermediate advanced enterprise; do
     echo "Testing $tier tier..."
-    
+
     # Generate from static template
     ./bin/template-health-endpoint template from-static \
         --name "test-$tier" \
         --tier "$tier" \
         --module "github.com/test/$tier" \
         --output "test-$tier"
-    
+
     # Test compilation
     cd "test-$tier"
     go mod tidy
     go build -o "bin/test-$tier" cmd/server/main.go
-    
+
     # Test runtime (start server and test endpoints)
     ./bin/test-$tier &
     SERVER_PID=$!
     sleep 3
-    
+
     # Test all health endpoints
     curl -f http://localhost:8080/health
     curl -f http://localhost:8080/health/time
     curl -f http://localhost:8080/health/ready
     curl -f http://localhost:8080/health/live
     curl -f http://localhost:8080/health/startup
-    
+
     # Test tier-specific endpoints
     if [[ "$tier" != "basic" ]]; then
         curl -f http://localhost:8080/health/dependencies || echo "Dependencies endpoint not configured (expected)"
     fi
-    
+
     if [[ "$tier" == "advanced" || "$tier" == "enterprise" ]]; then
         curl -f http://localhost:8080/health/metrics || echo "Metrics endpoint not configured (expected)"
     fi
-    
+
     # Stop server and clean up
     kill $SERVER_PID
     cd ..
     rm -rf "test-$tier"
-    
+
     echo "✅ $tier tier test passed"
 done
 
@@ -491,15 +662,15 @@ echo "🎉 All tests passed!"
 Basic:
   features: {kubernetes: true, typescript: true, docker: true}
   endpoints: ["/health", "/health/time", "/health/ready", "/health/live", "/health/startup"]
-  
+
 Intermediate:
   features: {kubernetes: true, typescript: true, docker: true, opentelemetry: basic, dependencies: true}
   endpoints: [...basic, "/health/dependencies"]
-  
+
 Advanced:
   features: {kubernetes: true, typescript: true, docker: true, opentelemetry: full, cloudevents: true, server_timing: true}
   endpoints: [...intermediate, "/health/metrics"]
-  
+
 Enterprise:
   features: {kubernetes: true, typescript: true, docker: true, opentelemetry: full, cloudevents: true, server_timing: true, security: mtls, compliance: true}
   endpoints: [...advanced, "/health/compliance"]
@@ -536,20 +707,20 @@ func (tp *TemplateProcessor) Process() error {
     if err != nil {
         return err
     }
-    
+
     // 2. Process template variables
     context := tp.createTemplateContext(metadata)
-    
+
     // 3. Apply tier-specific features
     if err := tp.applyTierFeatures(context); err != nil {
         return err
     }
-    
+
     // 4. Generate output files
     if err := tp.generateFiles(context); err != nil {
         return err
     }
-    
+
     // 5. Validate generated project
     return tp.validateOutput()
 }
@@ -568,6 +739,17 @@ func (tp *TemplateProcessor) Process() error {
 - [ ] OpenTelemetry integration works in intermediate/advanced/enterprise tiers
 - [ ] CloudEvents emission works in advanced/enterprise tiers
 - [ ] mTLS and compliance features work in enterprise tier
+
+### **BDD Testing Requirements**
+- [ ] All CLI commands have comprehensive BDD scenarios
+- [ ] All template tiers have generation and validation BDD scenarios
+- [ ] All migration paths have BDD coverage with user stories
+- [ ] Error conditions are thoroughly tested with BDD scenarios
+- [ ] Performance requirements are validated through BDD scenarios
+- [ ] Integration points (Kubernetes, etc.) are tested with BDD
+- [ ] User workflows are covered end-to-end with natural language scenarios
+- [ ] BDD scenarios serve as living documentation for user expectations
+- [ ] All BDD tests pass consistently in CI/CD pipeline
 
 ### **Quality Requirements**
 - [ ] Comprehensive test coverage for all tiers and CLI commands
@@ -597,17 +779,19 @@ func (tp *TemplateProcessor) Process() error {
 2. **Add Advanced Tier**: Implement full observability features
 3. **Create Enterprise Tier**: Add security and compliance features
 4. **Implement CLI Commands**: Add update, migrate, customize functionality
-5. **Comprehensive Testing**: Validate all tiers and CLI commands
-6. **Final Documentation**: Ensure all documentation is current and complete
+5. **Comprehensive BDD Testing**: Implement behavior-driven development scenarios
+6. **Final Validation**: Ensure all tiers and CLI commands work correctly
+7. **Documentation Updates**: Ensure all documentation reflects completed features
 
 ### **Validation Steps**
 1. Generate projects from all template tiers
 2. Compile and run all generated projects
 3. Test all health endpoints for each tier
 4. Test CLI commands with real projects
-5. Validate Kubernetes deployments
-6. Run comprehensive test suite
-7. Verify GitHub issue #127 requirements are met
+5. Run comprehensive BDD test suite
+6. Validate Kubernetes deployments
+7. Verify performance requirements through BDD scenarios
+8. Verify GitHub issue #127 requirements are met
 
 ## 📚 **Context and Background**
 
