@@ -1,16 +1,28 @@
 import "@typespec/http";
 import "@typespec/rest";
+import "@typespec/openapi3";
 import "../health/health.tsp";
 import "../health/server-time.tsp";
 import "../health/health-api.tsp";
 
 using TypeSpec.Http;
 using TypeSpec.Rest;
+using TypeSpec.OpenAPI;
 using HealthAPI;
 
 /**
  * Basic tier health API - minimal health checking functionality
  * Deployment time: ~5 minutes
+ * 
+ * Features:
+ * - Core health endpoints (/health, /time, /ready, /live, /startup)
+ * - HTTP/1.1 support
+ * - HTTP native streaming
+ * - Basic security headers
+ * - TLS/HTTPS support
+ * - API documentation (OpenAPI)
+ * - Docker containerization ready
+ * - Kubernetes manifests with health probes
  */
 namespace BasicTier;
 
@@ -116,6 +128,20 @@ interface BasicHealthAPI {
   @route("/ready")
 
   readinessCheck(): {
+    @statusCode statusCode: 200;
+    @body body: BasicHealthReport;
+  } | {
+    @statusCode statusCode: 503;
+    @body body: HealthError;
+  };
+
+  /**
+   * Kubernetes startup probe
+   */
+  @get
+  @route("/startup")
+
+  startupCheck(): {
     @statusCode statusCode: 200;
     @body body: BasicHealthReport;
   } | {

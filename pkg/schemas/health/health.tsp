@@ -5,10 +5,6 @@ import "@typespec/openapi3";
 using TypeSpec.Http;
 using TypeSpec.Rest;
 
-@service({
-  title: "Health API",
-  version: "1.0.0",
-})
 namespace HealthAPI;
 
 /**

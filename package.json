@@ -11,12 +11,14 @@
     "lint": "tsp compile . --no-emit"
   },
   "devDependencies": {
-    "@typespec/compiler": "^0.50.0",
-    "@typespec/http": "^0.50.0",
-    "@typespec/rest": "^0.50.0",
-    "@typespec/openapi3": "^0.50.0",
-    "@typespec/json-schema": "^0.50.0",
-    "@typespec/prettier-plugin-typespec": "^0.50.0"
+    "@typespec/compiler": "^1.0.0",
+    "@typespec/http": "^1.0.1",
+    "@typespec/json-schema": "^1.0.0",
+    "@typespec/openapi": "^1.0.0",
+    "@typespec/openapi3": "^1.0.0",
+    "@typespec/prettier-plugin-typespec": "^1.0.0",
+    "@typespec/rest": "^0.70.0",
+    "@typespec/versioning": "^0.70.0"
   },
   "keywords": [
     "typespec",

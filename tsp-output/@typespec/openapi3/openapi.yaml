@@ -1,0 +1,672 @@
+openapi: 3.0.0
+info:
+  title: (title)
+  version: 0.0.0
+tags: []
+paths:
+  /health:
+    get:
+      operationId: HealthEndpoints_checkHealth
+      description: |-
+        Basic health check endpoint
+        Returns overall service health status with individual check results
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthAPI.HealthReport'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthError'
+  /health/config:
+    get:
+      operationId: ExtendedHealthEndpoints_getHealthConfig
+      description: Health check configuration and status
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  checks:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        interval:
+                          type: string
+                          format: duration
+                        timeout:
+                          type: string
+                          format: duration
+                        threshold:
+                          type: object
+                          properties:
+                            warning:
+                              type: number
+                              format: double
+                            critical:
+                              type: number
+                              format: double
+                      required:
+                        - enabled
+                        - interval
+                        - timeout
+                        - threshold
+                  version:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+                required:
+                  - checks
+                  - version
+                  - timestamp
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthError'
+  /health/dependencies:
+    get:
+      operationId: HealthEndpoints_dependencyChecks
+      description: |-
+        Individual dependency health checks
+        Returns status of external dependencies (databases, APIs, etc.)
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/DependencyStatus'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthError'
+  /health/live:
+    get:
+      operationId: HealthEndpoints_livenessCheck
+      description: |-
+        Kubernetes liveness probe endpoint
+        Indicates if the service is alive and should not be restarted
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthAPI.HealthReport'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthError'
+  /health/metrics:
+    get:
+      operationId: ExtendedHealthEndpoints_getMetrics
+      description: Detailed system metrics and performance data
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  systemInfo:
+                    $ref: '#/components/schemas/HealthAPI.SystemInfo'
+                  performance:
+                    $ref: '#/components/schemas/HealthAPI.PerformanceMetrics'
+                  timestamp:
+                    type: string
+                    format: date-time
+                  traceId:
+                    type: string
+                required:
+                  - systemInfo
+                  - performance
+                  - timestamp
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthError'
+  /health/ready:
+    get:
+      operationId: HealthEndpoints_readinessCheck
+      description: |-
+        Kubernetes readiness probe endpoint
+        Indicates if the service is ready to receive traffic
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthAPI.HealthReport'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthError'
+  /health/startup:
+    get:
+      operationId: HealthEndpoints_startupCheck
+      description: |-
+        Startup probe endpoint for Kubernetes
+        Indicates if the service has finished starting up
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthAPI.HealthReport'
+        '503':
+          description: Service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthError'
+  /health/time:
+    get:
+      operationId: HealthEndpoints_serverTime
+      description: |-
+        Server time endpoint with comprehensive timestamp formats
+        Useful for time synchronization and debugging
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerTime'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthError'
+components:
+  schemas:
+    DependencyStatus:
+      type: object
+      required:
+        - name
+        - status
+        - lastCheck
+      properties:
+        name:
+          type: string
+          description: Dependency name identifier
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+            - disabled
+            - error
+          description: Current status of the dependency
+        responseTime:
+          type: number
+          format: double
+          description: Response time in milliseconds
+        error:
+          type: string
+          description: Error message if dependency is unhealthy
+        lastCheck:
+          type: string
+          format: date-time
+          description: Last successful check timestamp
+        endpoint:
+          type: string
+          description: Dependency endpoint or connection string (sanitized)
+        type:
+          type: string
+          description: Dependency type (database, cache, api, etc.)
+        metadata:
+          description: Additional dependency-specific metadata
+      description: Dependency health check result
+    FormattedTimestamps:
+      type: object
+      required:
+        - human
+        - date
+        - time
+        - datetime
+        - rfc822
+        - rfc850
+        - rfc1123
+        - kitchen
+        - stamp
+      properties:
+        human:
+          type: string
+          description: Human-readable format (e.g., "Monday, January 2, 2006 at 3:04:05 PM MST")
+        date:
+          type: string
+          description: Date only in YYYY-MM-DD format
+        time:
+          type: string
+          description: Time only in HH:MM:SS format
+        datetime:
+          type: string
+          description: DateTime in YYYY-MM-DD HH:MM:SS format
+        rfc822:
+          type: string
+          description: RFC822 formatted timestamp
+        rfc850:
+          type: string
+          description: RFC850 formatted timestamp
+        rfc1123:
+          type: string
+          description: RFC1123 formatted timestamp
+        kitchen:
+          type: string
+          description: Kitchen format (3:04PM)
+        stamp:
+          type: string
+          description: Stamp format (Jan _2 15:04:05)
+      description: Various formatted timestamp representations
+    HealthAPI.HealthCheck:
+      type: object
+      required:
+        - name
+        - status
+        - lastChecked
+      properties:
+        name:
+          type: string
+          description: Unique identifier for the health check
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+            - disabled
+            - error
+          description: Current status of this check
+        message:
+          type: string
+          description: Optional descriptive message about the check result
+        duration:
+          type: string
+          description: Duration taken to execute this check (e.g., "15.2ms")
+        lastChecked:
+          type: string
+          format: date-time
+          description: Timestamp when this check was last executed
+        details:
+          description: Additional check-specific details and metrics
+      description: Individual health check result
+    HealthAPI.HealthReport:
+      type: object
+      required:
+        - status
+        - timestamp
+        - version
+        - uptime
+        - uptimeHuman
+        - checks
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+          description: Overall aggregated health status
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp when this report was generated
+        version:
+          type: string
+          description: Service version identifier
+        uptime:
+          type: string
+          format: duration
+          description: Service uptime duration
+        uptimeHuman:
+          type: string
+          description: Human-readable uptime description
+        checks:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/HealthAPI.HealthCheck'
+          description: Map of individual health check results
+        systemInfo:
+          allOf:
+            - $ref: '#/components/schemas/HealthAPI.SystemInfo'
+          description: Optional system information
+        performance:
+          allOf:
+            - $ref: '#/components/schemas/HealthAPI.PerformanceMetrics'
+          description: Optional performance metrics
+        serverTime:
+          allOf:
+            - $ref: '#/components/schemas/ServerTimeInfo'
+          description: Optional server time information
+        traceId:
+          type: string
+          description: Optional OpenTelemetry trace ID for correlation
+        serverTiming:
+          allOf:
+            - $ref: '#/components/schemas/HealthAPI.ServerTimingMetrics'
+          description: Optional Server-Timing metrics
+      description: Comprehensive health report for the service
+    HealthAPI.PerformanceMetrics:
+      type: object
+      required:
+        - allocatedMemory
+        - systemMemory
+        - gcCount
+        - goroutines
+        - cpuUsagePercent
+      properties:
+        allocatedMemory:
+          type: integer
+          format: int64
+          description: Current memory allocation in bytes
+        systemMemory:
+          type: integer
+          format: int64
+          description: System memory usage in bytes
+        gcCount:
+          type: integer
+          format: int32
+          description: Number of garbage collection cycles
+        goroutines:
+          type: integer
+          format: int32
+          description: Number of active goroutines
+        cpuUsagePercent:
+          type: number
+          format: double
+          description: CPU usage percentage
+      description: Performance metrics for the service
+    HealthAPI.ServerTimingMetrics:
+      type: object
+      properties:
+        dbQuery:
+          type: number
+          format: double
+          description: Database query time in milliseconds
+        cacheHit:
+          type: number
+          format: double
+          description: Cache lookup time in milliseconds
+        total:
+          type: number
+          format: double
+          description: Total processing time in milliseconds
+        externalApi:
+          type: number
+          format: double
+          description: External API call time in milliseconds
+        auth:
+          type: number
+          format: double
+          description: Authentication time in milliseconds
+        validation:
+          type: number
+          format: double
+          description: Validation time in milliseconds
+      description: Server-Timing API metrics for performance analysis
+    HealthAPI.SystemInfo:
+      type: object
+      required:
+        - os
+        - arch
+        - cpuCores
+        - totalMemory
+        - availableMemory
+        - memoryUsagePercent
+      properties:
+        os:
+          type: string
+          description: Operating system name
+        arch:
+          type: string
+          description: System architecture
+        cpuCores:
+          type: integer
+          format: int32
+          description: Number of CPU cores
+        totalMemory:
+          type: integer
+          format: int64
+          description: Total system memory in bytes
+        availableMemory:
+          type: integer
+          format: int64
+          description: Available memory in bytes
+        memoryUsagePercent:
+          type: number
+          format: double
+          description: Memory usage percentage
+      description: System information and resource metrics
+    HealthError:
+      type: object
+      required:
+        - code
+        - message
+        - timestamp
+      properties:
+        code:
+          type: string
+          description: Error code identifier
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          description: Additional error details
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp when the error occurred
+        traceId:
+          type: string
+          description: Optional trace ID for debugging
+      description: Error response model for health API endpoints
+    IntermediateTier.IntermediateHealthReport:
+      type: object
+      properties:
+        otelMetrics:
+          type: object
+          properties:
+            spanCount:
+              type: integer
+              format: int32
+              description: Number of spans created
+            metricsExported:
+              type: integer
+              format: int32
+              description: Number of metrics exported
+            samplingRate:
+              type: number
+              format: double
+              description: Trace sampling rate
+          description: Basic OpenTelemetry metrics for observability
+        cacheStats:
+          type: object
+          properties:
+            hitRate:
+              type: number
+              format: double
+              description: Cache hit rate percentage
+            entryCount:
+              type: integer
+              format: int32
+              description: Number of cache entries
+            memoryUsage:
+              type: integer
+              format: int64
+              description: Cache memory usage in bytes
+          description: Cache layer statistics if enabled
+      allOf:
+        - $ref: '#/components/schemas/HealthAPI.HealthReport'
+      description: Enhanced health report for intermediate tier
+    ServerTime:
+      type: object
+      required:
+        - serverTime
+        - formatted
+        - unixTimestamps
+        - timezoneInfo
+      properties:
+        serverTime:
+          allOf:
+            - $ref: '#/components/schemas/ServerTimeInfo'
+          description: Core server time information
+        formatted:
+          allOf:
+            - $ref: '#/components/schemas/FormattedTimestamps'
+          description: Various formatted timestamp representations
+        unixTimestamps:
+          allOf:
+            - $ref: '#/components/schemas/UnixTimestamps'
+          description: Unix timestamps in different precisions
+        timezoneInfo:
+          allOf:
+            - $ref: '#/components/schemas/TimezoneInfo'
+          description: Detailed timezone information
+        traceId:
+          type: string
+          description: Optional OpenTelemetry trace ID for correlation
+        serverTiming:
+          allOf:
+            - $ref: '#/components/schemas/HealthAPI.ServerTimingMetrics'
+          description: Optional Server-Timing metrics
+      description: Complete server time response with all timestamp formats
+    ServerTimeInfo:
+      type: object
+      required:
+        - timezone
+        - utcTime
+        - localTime
+        - utcOffset
+        - epoch
+        - iso8601
+        - rfc3339Nano
+        - timezoneAbbr
+        - isDST
+      properties:
+        timezone:
+          type: string
+          description: Server timezone identifier (e.g., "UTC", "America/New_York")
+        utcTime:
+          type: string
+          format: date-time
+          description: Current time in UTC
+        localTime:
+          type: string
+          format: date-time
+          description: Current time in server's local timezone
+        utcOffset:
+          type: string
+          description: UTC offset string (e.g., "+00:00", "-05:00")
+        epoch:
+          type: integer
+          format: int64
+          description: Unix timestamp in seconds
+        iso8601:
+          type: string
+          description: ISO8601 formatted timestamp
+        rfc3339Nano:
+          type: string
+          description: RFC3339 nano precision timestamp
+        timezoneAbbr:
+          type: string
+          description: Timezone abbreviation (e.g., "UTC", "EST")
+        isDST:
+          type: boolean
+          description: Whether daylight saving time is active
+      description: Core server time information with timezone details
+    TimezoneInfo:
+      type: object
+      required:
+        - name
+        - abbreviation
+        - offsetSeconds
+        - offsetHours
+        - isDST
+        - standardAbbr
+      properties:
+        name:
+          type: string
+          description: Full timezone name
+        abbreviation:
+          type: string
+          description: Timezone abbreviation
+        offsetSeconds:
+          type: integer
+          format: int32
+          description: Offset from UTC in seconds
+        offsetHours:
+          type: number
+          format: double
+          description: Offset from UTC in hours (decimal)
+        isDST:
+          type: boolean
+          description: Whether daylight saving time is currently active
+        standardAbbr:
+          type: string
+          description: Standard timezone abbreviation
+        daylightAbbr:
+          type: string
+          description: Daylight saving timezone abbreviation
+      description: Timezone information details
+    UnixTimestamps:
+      type: object
+      required:
+        - seconds
+        - milliseconds
+        - microseconds
+        - nanoseconds
+      properties:
+        seconds:
+          type: integer
+          format: int64
+          description: Unix timestamp in seconds
+        milliseconds:
+          type: integer
+          format: int64
+          description: Unix timestamp in milliseconds
+        microseconds:
+          type: integer
+          format: int64
+          description: Unix timestamp in microseconds
+        nanoseconds:
+          type: integer
+          format: int64
+          description: Unix timestamp in nanoseconds
+      description: Unix timestamps in different precision levels

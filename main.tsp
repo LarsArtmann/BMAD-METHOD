@@ -10,6 +10,9 @@ import "./pkg/schemas/health/cloudevents.tsp";
 
 // Import tier-specific schemas
 import "./pkg/schemas/tiers/basic.tsp";
+import "./pkg/schemas/tiers/intermediate.tsp";
+import "./pkg/schemas/tiers/advanced.tsp";
+import "./pkg/schemas/tiers/enterprise.tsp";
 
 using TypeSpec.Http;
 using TypeSpec.Rest;
@@ -20,11 +23,6 @@ using TypeSpec.Rest;
  * A comprehensive TypeSpec-driven health endpoint template system
  * supporting four tiers of complexity: Basic, Intermediate, Advanced, Enterprise
  */
-@service({
-  title: "Template Health Endpoint API",
-  version: "1.0.0",
-  description: "TypeSpec-driven health endpoint templates with progressive complexity tiers"
-})
 @server("https://api.example.com", "Production server")
 @server("http://localhost:8080", "Development server")
 namespace TemplateHealthEndpoint;
@@ -33,6 +31,9 @@ namespace TemplateHealthEndpoint;
 alias MainHealthAPI = HealthEndpoints;
 alias ExtendedAPI = ExtendedHealthEndpoints;
 alias BasicAPI = BasicTier.BasicHealthAPI;
+alias IntermediateAPI = IntermediateTier.IntermediateHealthAPI;
+alias AdvancedAPI = AdvancedTier.AdvancedHealthAPI;
+alias EnterpriseAPI = EnterpriseTier.EnterpriseHealthAPI;
 
 // Re-export core models
 alias HealthStatus = HealthAPI.HealthStatus;
