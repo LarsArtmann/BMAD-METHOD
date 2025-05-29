@@ -177,6 +177,50 @@ tool-name migrate           # Migrate between tiers
 
 ---
 
+## Issue Alignment and Requirement Validation
+
+### Critical Importance of Requirement Analysis
+
+**Always validate current work against original requirements:**
+- **Read Complete Issues**: Always read the entire original issue including all comments and related issues
+- **Use GitHub API**: Programmatically fetch issues to ensure complete context
+- **Periodic Validation**: Regularly validate current work against original requirements
+- **Document Gaps**: Clearly document any deviations with justification
+
+### Requirement Validation Process
+
+```bash
+# Use GitHub API to fetch original issue
+gh api repos/owner/repo/issues/123 > original-issue.json
+gh api repos/owner/repo/issues/123/comments > issue-comments.json
+
+# Document analysis
+echo "Original Requirements:" > requirements-analysis.md
+echo "Current Implementation:" >> requirements-analysis.md
+echo "Gaps Identified:" >> requirements-analysis.md
+echo "Alignment Strategy:" >> requirements-analysis.md
+```
+
+### Course Correction Strategy
+
+**When misalignment is discovered:**
+1. **Assess Impact**: Determine scope of required changes
+2. **Preserve Value**: Identify valuable work that can be adapted
+3. **Plan Restructuring**: Design minimal changes to meet requirements
+4. **Communicate Changes**: Update stakeholders on scope/timeline adjustments
+5. **Implement Systematically**: Execute realignment with proper testing
+
+### Validation Checklist
+
+- [ ] Original issue read completely including all comments
+- [ ] Related issues reviewed and understood
+- [ ] Current implementation audited against requirements
+- [ ] Gaps identified and prioritized
+- [ ] Alignment strategy documented and approved
+- [ ] Stakeholder expectations reset if needed
+
+---
+
 ## Development Principles
 
 ### Incremental Development Approach
