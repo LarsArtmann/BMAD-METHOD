@@ -1,0 +1,88 @@
+{
+  "users": {
+    "admin": {
+      "id": "admin",
+      "roles": [
+        {
+          "name": "admin",
+          "permissions": [
+            "health:read",
+            "health:write",
+            "metrics:read",
+            "dependency:read",
+            "admin:access"
+          ]
+        }
+      ]
+    },
+    "monitor": {
+      "id": "monitor",
+      "roles": [
+        {
+          "name": "monitor",
+          "permissions": [
+            "health:read",
+            "metrics:read",
+            "dependency:read"
+          ]
+        }
+      ]
+    },
+    "service": {
+      "id": "service",
+      "roles": [
+        {
+          "name": "service",
+          "permissions": [
+            "health:read"
+          ]
+        }
+      ]
+    },
+    "ci-cd": {
+      "id": "ci-cd",
+      "roles": [
+        {
+          "name": "deployment",
+          "permissions": [
+            "health:read",
+            "health:write"
+          ]
+        }
+      ]
+    }
+  },
+  "roles": {
+    "admin": {
+      "name": "admin",
+      "permissions": [
+        "health:read",
+        "health:write",
+        "metrics:read",
+        "dependency:read",
+        "admin:access"
+      ]
+    },
+    "monitor": {
+      "name": "monitor",
+      "permissions": [
+        "health:read",
+        "metrics:read",
+        "dependency:read"
+      ]
+    },
+    "service": {
+      "name": "service",
+      "permissions": [
+        "health:read"
+      ]
+    },
+    "deployment": {
+      "name": "deployment",
+      "permissions": [
+        "health:read",
+        "health:write"
+      ]
+    }
+  }
+}

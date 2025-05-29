@@ -1,0 +1,120 @@
+package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+	"time"
+)
+
+// ServerTimeHandler handles server time requests
+type ServerTimeHandler struct{}
+
+// NewServerTimeHandler creates a new server time handler
+func NewServerTimeHandler() *ServerTimeHandler {
+	return &ServerTimeHandler{}
+}
+
+// ServerTimeResponse represents the server time response
+type ServerTimeResponse struct {
+	Timestamp    time.Time `json:"timestamp"`
+	Unix         int64     `json:"unix"`
+	UnixMilli    int64     `json:"unix_milli"`
+	UnixMicro    int64     `json:"unix_micro"`
+	UnixNano     int64     `json:"unix_nano"`
+	RFC3339      string    `json:"rfc3339"`
+	RFC3339Nano  string    `json:"rfc3339_nano"`
+	Layout       string    `json:"layout"`
+	Kitchen      string    `json:"kitchen"`
+	Stamp        string    `json:"stamp"`
+	StampMilli   string    `json:"stamp_milli"`
+	StampMicro   string    `json:"stamp_micro"`
+	StampNano    string    `json:"stamp_nano"`
+	Timezone     string    `json:"timezone"`
+	UTCOffset    string    `json:"utc_offset"`
+}
+
+// GetServerTime handles GET /health/time requests
+func (h *ServerTimeHandler) GetServerTime(w http.ResponseWriter, r *http.Request) {
+	now := time.Now()
+	
+	response := ServerTimeResponse{
+		Timestamp:    now,
+		Unix:         now.Unix(),
+		UnixMilli:    now.UnixMilli(),
+		UnixMicro:    now.UnixMicro(),
+		UnixNano:     now.UnixNano(),
+		RFC3339:      now.Format(time.RFC3339),
+		RFC3339Nano:  now.Format(time.RFC3339Nano),
+		Layout:       now.Format(time.Layout),
+		Kitchen:      now.Format(time.Kitchen),
+		Stamp:        now.Format(time.Stamp),
+		StampMilli:   now.Format(time.StampMilli),
+		StampMicro:   now.Format(time.StampMicro),
+		StampNano:    now.Format(time.StampNano),
+		Timezone:     now.Location().String(),
+		UTCOffset:    now.Format("-07:00"),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+	
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+// GetServerTimeUTC handles GET /health/time/utc requests
+func (h *ServerTimeHandler) GetServerTimeUTC(w http.ResponseWriter, r *http.Request) {
+	now := time.Now().UTC()
+	
+	response := ServerTimeResponse{
+		Timestamp:    now,
+		Unix:         now.Unix(),
+		UnixMilli:    now.UnixMilli(),
+		UnixMicro:    now.UnixMicro(),
+		UnixNano:     now.UnixNano(),
+		RFC3339:      now.Format(time.RFC3339),
+		RFC3339Nano:  now.Format(time.RFC3339Nano),
+		Layout:       now.Format(time.Layout),
+		Kitchen:      now.Format(time.Kitchen),
+		Stamp:        now.Format(time.Stamp),
+		StampMilli:   now.Format(time.StampMilli),
+		StampMicro:   now.Format(time.StampMicro),
+		StampNano:    now.Format(time.StampNano),
+		Timezone:     "UTC",
+		UTCOffset:    "+00:00",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+	
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+// GetServerTimeUnix handles GET /health/time/unix requests
+func (h *ServerTimeHandler) GetServerTimeUnix(w http.ResponseWriter, r *http.Request) {
+	now := time.Now()
+	
+	response := map[string]interface{}{
+		"unix":       now.Unix(),
+		"unix_milli": now.UnixMilli(),
+		"unix_micro": now.UnixMicro(),
+		"unix_nano":  now.UnixNano(),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}

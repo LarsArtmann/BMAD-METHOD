@@ -1,0 +1,85 @@
+# Staging Environment Configuration
+environment: staging
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: 30s
+  write_timeout: 30s
+  idle_timeout: 120s
+
+# Security settings for staging
+security:
+  mtls:
+    enabled: true
+    cert_file: "/etc/ssl/certs/server.crt"
+    key_file: "/etc/ssl/private/server.key"
+    ca_file: "/etc/ssl/certs/ca.crt"
+    client_auth: "RequireAndVerifyClientCert"
+  
+  rbac:
+    enabled: true
+    policy_file: "configs/rbac-staging.json"
+    default_role: "service"
+  
+  audit:
+    enabled: true
+    log_file: "/var/log/{{.ServiceName}}/audit.log"
+    level: "info"
+
+# Database/Dependencies
+dependencies:
+  database:
+    enabled: true
+    connection_string: "${DATABASE_URL}"
+    max_connections: 25
+    timeout: 10s
+  
+  redis:
+    enabled: true
+    address: "${REDIS_URL}"
+    password: "${REDIS_PASSWORD}"
+    db: 0
+
+# Observability
+observability:
+  metrics:
+    enabled: true
+    path: "/metrics"
+    
+  tracing:
+    enabled: true
+    endpoint: "${JAEGER_ENDPOINT}"
+    service_name: "{{.ServiceName}}-staging"
+    sample_rate: 0.1
+    
+  logging:
+    level: "info"
+    format: "json"
+    output: "stdout"
+
+# Health check configuration
+health:
+  check_interval: 60s
+  timeout: 10s
+  
+# CloudEvents
+cloudevents:
+  enabled: true
+  source: "{{.ServiceName}}/staging"
+  sink: "${CLOUDEVENTS_SINK}"
+
+# Staging-specific settings
+staging:
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 1000
+  
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5
+    timeout: 30s
+    
+  caching:
+    enabled: true
+    ttl: 300s

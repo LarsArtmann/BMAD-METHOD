@@ -1,0 +1,84 @@
+{
+  "users": {
+    "admin": {
+      "id": "admin",
+      "roles": [
+        {
+          "name": "admin",
+          "permissions": [
+            "health:read",
+            "metrics:read",
+            "dependency:read",
+            "admin:access"
+          ]
+        }
+      ]
+    },
+    "monitor": {
+      "id": "monitor",
+      "roles": [
+        {
+          "name": "monitor",
+          "permissions": [
+            "health:read",
+            "metrics:read",
+            "dependency:read"
+          ]
+        }
+      ]
+    },
+    "service": {
+      "id": "service",
+      "roles": [
+        {
+          "name": "service",
+          "permissions": [
+            "health:read"
+          ]
+        }
+      ]
+    },
+    "loadbalancer": {
+      "id": "loadbalancer",
+      "roles": [
+        {
+          "name": "healthcheck",
+          "permissions": [
+            "health:read"
+          ]
+        }
+      ]
+    }
+  },
+  "roles": {
+    "admin": {
+      "name": "admin",
+      "permissions": [
+        "health:read",
+        "metrics:read",
+        "dependency:read",
+        "admin:access"
+      ]
+    },
+    "monitor": {
+      "name": "monitor",
+      "permissions": [
+        "health:read",
+        "metrics:read",
+        "dependency:read"
+      ]
+    },
+    "service": {
+      "name": "service",
+      "permissions": [
+        "health:read"
+      ]
+    },
+    "healthcheck": {
+      "name": "healthcheck",
+      "permissions": [
+        "health:read"
+      ]
+    }
+  }
+}

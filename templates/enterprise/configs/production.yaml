@@ -1,0 +1,100 @@
+# Production Environment Configuration
+environment: production
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: 30s
+  write_timeout: 30s
+  idle_timeout: 120s
+
+# Security settings for production
+security:
+  mtls:
+    enabled: true
+    cert_file: "/etc/ssl/certs/server.crt"
+    key_file: "/etc/ssl/private/server.key"
+    ca_file: "/etc/ssl/certs/ca.crt"
+    client_auth: "RequireAndVerifyClientCert"
+  
+  rbac:
+    enabled: true
+    policy_file: "/etc/{{.ServiceName}}/rbac.json"
+    default_role: "service"
+  
+  audit:
+    enabled: true
+    log_file: "/var/log/{{.ServiceName}}/audit.log"
+    level: "warn"
+    retention_days: 90
+
+# Database/Dependencies
+dependencies:
+  database:
+    enabled: true
+    connection_string: "${DATABASE_URL}"
+    max_connections: 50
+    timeout: 15s
+    ssl_mode: "require"
+  
+  redis:
+    enabled: true
+    address: "${REDIS_URL}"
+    password: "${REDIS_PASSWORD}"
+    db: 0
+    ssl_enabled: true
+
+# Observability
+observability:
+  metrics:
+    enabled: true
+    path: "/metrics"
+    
+  tracing:
+    enabled: true
+    endpoint: "${JAEGER_ENDPOINT}"
+    service_name: "{{.ServiceName}}"
+    sample_rate: 0.01  # Lower sampling for production
+    
+  logging:
+    level: "warn"
+    format: "json"
+    output: "stdout"
+
+# Health check configuration
+health:
+  check_interval: 30s
+  timeout: 15s
+  
+# CloudEvents
+cloudevents:
+  enabled: true
+  source: "{{.ServiceName}}/production"
+  sink: "${CLOUDEVENTS_SINK}"
+
+# Production-specific settings
+production:
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 5000
+  
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 3
+    timeout: 60s
+    
+  caching:
+    enabled: true
+    ttl: 600s
+    
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retention_days: 30
+    
+  monitoring:
+    health_check_url: "/health"
+    metrics_url: "/metrics"
+    alert_endpoints:
+      - "${SLACK_WEBHOOK_URL}"
+      - "${PAGERDUTY_WEBHOOK_URL}"

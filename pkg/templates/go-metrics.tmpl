@@ -1,0 +1,298 @@
+package observability
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/prometheus"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/sdk/metric"
+)
+
+// MetricsConfig holds the configuration for OpenTelemetry metrics
+type MetricsConfig struct {
+	ServiceName    string
+	ServiceVersion string
+	Environment    string
+	Enabled        bool
+	PrometheusPort int
+}
+
+// MetricsProvider manages the OpenTelemetry metrics setup
+type MetricsProvider struct {
+	config   *MetricsConfig
+	provider *metric.MeterProvider
+	meter    metric.Meter
+	
+	// HTTP metrics
+	httpRequestsTotal    metric.Int64Counter
+	httpRequestDuration  metric.Float64Histogram
+	httpRequestsInFlight metric.Int64UpDownCounter
+	
+	// Health check metrics
+	healthCheckTotal    metric.Int64Counter
+	healthCheckDuration metric.Float64Histogram
+	
+	// Dependency metrics
+	dependencyCheckTotal    metric.Int64Counter
+	dependencyCheckDuration metric.Float64Histogram
+}
+
+// NewMetricsProvider creates a new metrics provider
+func NewMetricsProvider(config *MetricsConfig) (*MetricsProvider, error) {
+	if !config.Enabled {
+		return &MetricsProvider{
+			config: config,
+			meter:  otel.Meter(config.ServiceName),
+		}, nil
+	}
+
+	// Create Prometheus exporter
+	exporter, err := prometheus.New()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Prometheus exporter: %w", err)
+	}
+
+	// Create meter provider
+	provider := metric.NewMeterProvider(
+		metric.WithReader(exporter),
+	)
+
+	// Set global meter provider
+	otel.SetMeterProvider(provider)
+
+	// Create meter
+	meter := provider.Meter(config.ServiceName)
+
+	// Create metrics provider
+	mp := &MetricsProvider{
+		config:   config,
+		provider: provider,
+		meter:    meter,
+	}
+
+	// Initialize metrics
+	if err := mp.initializeMetrics(); err != nil {
+		return nil, fmt.Errorf("failed to initialize metrics: %w", err)
+	}
+
+	return mp, nil
+}
+
+// initializeMetrics creates all the metric instruments
+func (mp *MetricsProvider) initializeMetrics() error {
+	var err error
+
+	// HTTP metrics
+	mp.httpRequestsTotal, err = mp.meter.Int64Counter(
+		"http_requests_total",
+		metric.WithDescription("Total number of HTTP requests"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create http_requests_total counter: %w", err)
+	}
+
+	mp.httpRequestDuration, err = mp.meter.Float64Histogram(
+		"http_request_duration_seconds",
+		metric.WithDescription("HTTP request duration in seconds"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create http_request_duration_seconds histogram: %w", err)
+	}
+
+	mp.httpRequestsInFlight, err = mp.meter.Int64UpDownCounter(
+		"http_requests_in_flight",
+		metric.WithDescription("Number of HTTP requests currently being processed"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create http_requests_in_flight gauge: %w", err)
+	}
+
+	// Health check metrics
+	mp.healthCheckTotal, err = mp.meter.Int64Counter(
+		"health_check_total",
+		metric.WithDescription("Total number of health checks"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create health_check_total counter: %w", err)
+	}
+
+	mp.healthCheckDuration, err = mp.meter.Float64Histogram(
+		"health_check_duration_seconds",
+		metric.WithDescription("Health check duration in seconds"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create health_check_duration_seconds histogram: %w", err)
+	}
+
+	// Dependency metrics
+	mp.dependencyCheckTotal, err = mp.meter.Int64Counter(
+		"dependency_check_total",
+		metric.WithDescription("Total number of dependency checks"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create dependency_check_total counter: %w", err)
+	}
+
+	mp.dependencyCheckDuration, err = mp.meter.Float64Histogram(
+		"dependency_check_duration_seconds",
+		metric.WithDescription("Dependency check duration in seconds"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create dependency_check_duration_seconds histogram: %w", err)
+	}
+
+	return nil
+}
+
+// RecordHTTPRequest records metrics for an HTTP request
+func (mp *MetricsProvider) RecordHTTPRequest(method, path string, statusCode int, duration time.Duration) {
+	if !mp.config.Enabled {
+		return
+	}
+
+	attrs := []attribute.KeyValue{
+		attribute.String("method", method),
+		attribute.String("path", path),
+		attribute.Int("status_code", statusCode),
+	}
+
+	mp.httpRequestsTotal.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+	mp.httpRequestDuration.Record(context.Background(), duration.Seconds(), metric.WithAttributes(attrs...))
+}
+
+// IncrementHTTPRequestsInFlight increments the in-flight requests counter
+func (mp *MetricsProvider) IncrementHTTPRequestsInFlight() {
+	if !mp.config.Enabled {
+		return
+	}
+	mp.httpRequestsInFlight.Add(context.Background(), 1)
+}
+
+// DecrementHTTPRequestsInFlight decrements the in-flight requests counter
+func (mp *MetricsProvider) DecrementHTTPRequestsInFlight() {
+	if !mp.config.Enabled {
+		return
+	}
+	mp.httpRequestsInFlight.Add(context.Background(), -1)
+}
+
+// RecordHealthCheck records metrics for a health check
+func (mp *MetricsProvider) RecordHealthCheck(checkType string, success bool, duration time.Duration) {
+	if !mp.config.Enabled {
+		return
+	}
+
+	attrs := []attribute.KeyValue{
+		attribute.String("check_type", checkType),
+		attribute.Bool("success", success),
+	}
+
+	mp.healthCheckTotal.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+	mp.healthCheckDuration.Record(context.Background(), duration.Seconds(), metric.WithAttributes(attrs...))
+}
+
+// RecordDependencyCheck records metrics for a dependency check
+func (mp *MetricsProvider) RecordDependencyCheck(dependency string, success bool, duration time.Duration) {
+	if !mp.config.Enabled {
+		return
+	}
+
+	attrs := []attribute.KeyValue{
+		attribute.String("dependency", dependency),
+		attribute.Bool("success", success),
+	}
+
+	mp.dependencyCheckTotal.Add(context.Background(), 1, metric.WithAttributes(attrs...))
+	mp.dependencyCheckDuration.Record(context.Background(), duration.Seconds(), metric.WithAttributes(attrs...))
+}
+
+// MetricsMiddleware creates a middleware for recording HTTP metrics
+func (mp *MetricsProvider) MetricsMiddleware() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			mp.IncrementHTTPRequestsInFlight()
+			defer mp.DecrementHTTPRequestsInFlight()
+
+			// Create response writer wrapper to capture status code
+			wrapped := &responseWriter{ResponseWriter: w, statusCode: 200}
+
+			// Process request
+			next.ServeHTTP(wrapped, r)
+
+			// Record metrics
+			duration := time.Since(start)
+			mp.RecordHTTPRequest(r.Method, r.URL.Path, wrapped.statusCode, duration)
+		})
+	}
+}
+
+// responseWriter wraps http.ResponseWriter to capture status code
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+// Shutdown gracefully shuts down the metrics provider
+func (mp *MetricsProvider) Shutdown(ctx context.Context) error {
+	if mp.provider != nil {
+		return mp.provider.Shutdown(ctx)
+	}
+	return nil
+}
+
+// DefaultMetricsConfig returns a default metrics configuration
+func DefaultMetricsConfig(serviceName string) *MetricsConfig {
+	return &MetricsConfig{
+		ServiceName:    serviceName,
+		ServiceVersion: "1.0.0",
+		Environment:    "development",
+		Enabled:        true,
+		PrometheusPort: 9090,
+	}
+}
+
+// InitializeMetrics initializes OpenTelemetry metrics with default configuration
+func InitializeMetrics(serviceName string) (*MetricsProvider, error) {
+	config := DefaultMetricsConfig(serviceName)
+	
+	// Override with environment variables if available
+	if env := os.Getenv("ENVIRONMENT"); env != "" {
+		config.Environment = env
+	}
+	
+	if version := os.Getenv("SERVICE_VERSION"); version != "" {
+		config.ServiceVersion = version
+	}
+
+	provider, err := NewMetricsProvider(config)
+	if err != nil {
+		log.Printf("Failed to initialize metrics: %v", err)
+		// Return a no-op provider instead of failing
+		return &MetricsProvider{
+			config: &MetricsConfig{Enabled: false},
+			meter:  otel.Meter(serviceName),
+		}, nil
+	}
+
+	log.Printf("Metrics initialized for service: %s", serviceName)
+	return provider, nil
+}

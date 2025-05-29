@@ -1,0 +1,75 @@
+{
+  "users": {
+    "admin": {
+      "id": "admin",
+      "roles": [
+        {
+          "name": "admin",
+          "permissions": [
+            "health:read",
+            "health:write",
+            "metrics:read",
+            "dependency:read",
+            "admin:access"
+          ]
+        }
+      ]
+    },
+    "developer": {
+      "id": "developer",
+      "roles": [
+        {
+          "name": "developer",
+          "permissions": [
+            "health:read",
+            "health:write",
+            "metrics:read",
+            "dependency:read"
+          ]
+        }
+      ]
+    },
+    "monitor": {
+      "id": "monitor",
+      "roles": [
+        {
+          "name": "monitor",
+          "permissions": [
+            "health:read",
+            "metrics:read",
+            "dependency:read"
+          ]
+        }
+      ]
+    }
+  },
+  "roles": {
+    "admin": {
+      "name": "admin",
+      "permissions": [
+        "health:read",
+        "health:write",
+        "metrics:read",
+        "dependency:read",
+        "admin:access"
+      ]
+    },
+    "developer": {
+      "name": "developer",
+      "permissions": [
+        "health:read",
+        "health:write",
+        "metrics:read",
+        "dependency:read"
+      ]
+    },
+    "monitor": {
+      "name": "monitor",
+      "permissions": [
+        "health:read",
+        "metrics:read",
+        "dependency:read"
+      ]
+    }
+  }
+}

@@ -1,0 +1,269 @@
+package events
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	cloudevents "github.com/cloudevents/sdk-go/v2"
+	"github.com/cloudevents/sdk-go/v2/client"
+	"github.com/cloudevents/sdk-go/v2/protocol/http"
+)
+
+// EventsConfig holds the configuration for CloudEvents
+type EventsConfig struct {
+	ServiceName string
+	Source      string
+	SinkURL     string
+	Enabled     bool
+}
+
+// EventEmitter handles CloudEvents emission
+type EventEmitter struct {
+	config *EventsConfig
+	client client.Client
+}
+
+// HealthEvent represents a health check event
+type HealthEvent struct {
+	CheckType   string                 `json:"check_type"`
+	Status      string                 `json:"status"`
+	Timestamp   time.Time              `json:"timestamp"`
+	Duration    time.Duration          `json:"duration"`
+	Details     map[string]interface{} `json:"details,omitempty"`
+	Error       string                 `json:"error,omitempty"`
+}
+
+// DependencyEvent represents a dependency check event
+type DependencyEvent struct {
+	Dependency string                 `json:"dependency"`
+	Status     string                 `json:"status"`
+	Timestamp  time.Time              `json:"timestamp"`
+	Duration   time.Duration          `json:"duration"`
+	Details    map[string]interface{} `json:"details,omitempty"`
+	Error      string                 `json:"error,omitempty"`
+}
+
+// ServiceEvent represents a general service event
+type ServiceEvent struct {
+	EventType string                 `json:"event_type"`
+	Timestamp time.Time              `json:"timestamp"`
+	Data      map[string]interface{} `json:"data"`
+}
+
+// NewEventEmitter creates a new event emitter
+func NewEventEmitter(config *EventsConfig) (*EventEmitter, error) {
+	if !config.Enabled {
+		return &EventEmitter{
+			config: config,
+		}, nil
+	}
+
+	// Create HTTP protocol with sink URL
+	p, err := http.New(http.WithTarget(config.SinkURL))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP protocol: %w", err)
+	}
+
+	// Create CloudEvents client
+	c, err := client.New(p)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create CloudEvents client: %w", err)
+	}
+
+	return &EventEmitter{
+		config: config,
+		client: c,
+	}, nil
+}
+
+// EmitHealthEvent emits a health check event
+func (e *EventEmitter) EmitHealthEvent(ctx context.Context, event *HealthEvent) error {
+	if !e.config.Enabled {
+		return nil
+	}
+
+	// Create CloudEvent
+	ce := cloudevents.NewEvent()
+	ce.SetID(fmt.Sprintf("health-%d", time.Now().UnixNano()))
+	ce.SetSource(e.config.Source)
+	ce.SetType("{{.Config.Name}}.health.check")
+	ce.SetTime(event.Timestamp)
+	
+	if err := ce.SetData(cloudevents.ApplicationJSON, event); err != nil {
+		return fmt.Errorf("failed to set event data: %w", err)
+	}
+
+	// Send event
+	if result := e.client.Send(ctx, ce); cloudevents.IsUndelivered(result) {
+		return fmt.Errorf("failed to send health event: %w", result)
+	}
+
+	log.Printf("Health event emitted: %s - %s", event.CheckType, event.Status)
+	return nil
+}
+
+// EmitDependencyEvent emits a dependency check event
+func (e *EventEmitter) EmitDependencyEvent(ctx context.Context, event *DependencyEvent) error {
+	if !e.config.Enabled {
+		return nil
+	}
+
+	// Create CloudEvent
+	ce := cloudevents.NewEvent()
+	ce.SetID(fmt.Sprintf("dependency-%d", time.Now().UnixNano()))
+	ce.SetSource(e.config.Source)
+	ce.SetType("{{.Config.Name}}.dependency.check")
+	ce.SetTime(event.Timestamp)
+	
+	if err := ce.SetData(cloudevents.ApplicationJSON, event); err != nil {
+		return fmt.Errorf("failed to set event data: %w", err)
+	}
+
+	// Send event
+	if result := e.client.Send(ctx, ce); cloudevents.IsUndelivered(result) {
+		return fmt.Errorf("failed to send dependency event: %w", result)
+	}
+
+	log.Printf("Dependency event emitted: %s - %s", event.Dependency, event.Status)
+	return nil
+}
+
+// EmitServiceEvent emits a general service event
+func (e *EventEmitter) EmitServiceEvent(ctx context.Context, event *ServiceEvent) error {
+	if !e.config.Enabled {
+		return nil
+	}
+
+	// Create CloudEvent
+	ce := cloudevents.NewEvent()
+	ce.SetID(fmt.Sprintf("service-%d", time.Now().UnixNano()))
+	ce.SetSource(e.config.Source)
+	ce.SetType(fmt.Sprintf("{{.Config.Name}}.service.%s", event.EventType))
+	ce.SetTime(event.Timestamp)
+	
+	if err := ce.SetData(cloudevents.ApplicationJSON, event); err != nil {
+		return fmt.Errorf("failed to set event data: %w", err)
+	}
+
+	// Send event
+	if result := e.client.Send(ctx, ce); cloudevents.IsUndelivered(result) {
+		return fmt.Errorf("failed to send service event: %w", result)
+	}
+
+	log.Printf("Service event emitted: %s", event.EventType)
+	return nil
+}
+
+// EmitHealthCheckSuccess emits a successful health check event
+func (e *EventEmitter) EmitHealthCheckSuccess(ctx context.Context, checkType string, duration time.Duration, details map[string]interface{}) error {
+	event := &HealthEvent{
+		CheckType: checkType,
+		Status:    "healthy",
+		Timestamp: time.Now(),
+		Duration:  duration,
+		Details:   details,
+	}
+	return e.EmitHealthEvent(ctx, event)
+}
+
+// EmitHealthCheckFailure emits a failed health check event
+func (e *EventEmitter) EmitHealthCheckFailure(ctx context.Context, checkType string, duration time.Duration, err error, details map[string]interface{}) error {
+	event := &HealthEvent{
+		CheckType: checkType,
+		Status:    "unhealthy",
+		Timestamp: time.Now(),
+		Duration:  duration,
+		Details:   details,
+		Error:     err.Error(),
+	}
+	return e.EmitHealthEvent(ctx, event)
+}
+
+// EmitDependencyCheckSuccess emits a successful dependency check event
+func (e *EventEmitter) EmitDependencyCheckSuccess(ctx context.Context, dependency string, duration time.Duration, details map[string]interface{}) error {
+	event := &DependencyEvent{
+		Dependency: dependency,
+		Status:     "healthy",
+		Timestamp:  time.Now(),
+		Duration:   duration,
+		Details:    details,
+	}
+	return e.EmitDependencyEvent(ctx, event)
+}
+
+// EmitDependencyCheckFailure emits a failed dependency check event
+func (e *EventEmitter) EmitDependencyCheckFailure(ctx context.Context, dependency string, duration time.Duration, err error, details map[string]interface{}) error {
+	event := &DependencyEvent{
+		Dependency: dependency,
+		Status:     "unhealthy",
+		Timestamp:  time.Now(),
+		Duration:   duration,
+		Details:    details,
+		Error:      err.Error(),
+	}
+	return e.EmitDependencyEvent(ctx, event)
+}
+
+// EmitServiceStartup emits a service startup event
+func (e *EventEmitter) EmitServiceStartup(ctx context.Context) error {
+	event := &ServiceEvent{
+		EventType: "startup",
+		Timestamp: time.Now(),
+		Data: map[string]interface{}{
+			"service": e.config.ServiceName,
+			"version": "{{.Config.Version}}",
+		},
+	}
+	return e.EmitServiceEvent(ctx, event)
+}
+
+// EmitServiceShutdown emits a service shutdown event
+func (e *EventEmitter) EmitServiceShutdown(ctx context.Context) error {
+	event := &ServiceEvent{
+		EventType: "shutdown",
+		Timestamp: time.Now(),
+		Data: map[string]interface{}{
+			"service": e.config.ServiceName,
+			"version": "{{.Config.Version}}",
+		},
+	}
+	return e.EmitServiceEvent(ctx, event)
+}
+
+// DefaultEventsConfig returns a default events configuration
+func DefaultEventsConfig(serviceName string) *EventsConfig {
+	return &EventsConfig{
+		ServiceName: serviceName,
+		Source:      fmt.Sprintf("{{.Config.Name}}/%s", serviceName),
+		SinkURL:     "http://localhost:8080/events",
+		Enabled:     true,
+	}
+}
+
+// InitializeEvents initializes CloudEvents with default configuration
+func InitializeEvents(serviceName string) (*EventEmitter, error) {
+	config := DefaultEventsConfig(serviceName)
+	
+	// Override with environment variables if available
+	if sinkURL := os.Getenv("CLOUDEVENTS_SINK"); sinkURL != "" {
+		config.SinkURL = sinkURL
+	}
+	
+	if source := os.Getenv("CLOUDEVENTS_SOURCE"); source != "" {
+		config.Source = source
+	}
+
+	emitter, err := NewEventEmitter(config)
+	if err != nil {
+		log.Printf("Failed to initialize events: %v", err)
+		// Return a no-op emitter instead of failing
+		return &EventEmitter{
+			config: &EventsConfig{Enabled: false},
+		}, nil
+	}
+
+	log.Printf("Events initialized for service: %s", serviceName)
+	return emitter, nil
+}

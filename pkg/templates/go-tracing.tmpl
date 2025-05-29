@@ -1,0 +1,203 @@
+package observability
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	oteltrace "go.opentelemetry.io/otel/trace"
+)
+
+// TracingConfig holds the configuration for OpenTelemetry tracing
+type TracingConfig struct {
+	ServiceName     string
+	ServiceVersion  string
+	Environment     string
+	JaegerEndpoint  string
+	SampleRate      float64
+	Enabled         bool
+}
+
+// TracingProvider manages the OpenTelemetry tracing setup
+type TracingProvider struct {
+	config   *TracingConfig
+	provider *trace.TracerProvider
+	tracer   oteltrace.Tracer
+}
+
+// NewTracingProvider creates a new tracing provider
+func NewTracingProvider(config *TracingConfig) (*TracingProvider, error) {
+	if !config.Enabled {
+		return &TracingProvider{
+			config: config,
+			tracer: otel.Tracer(config.ServiceName),
+		}, nil
+	}
+
+	// Create Jaeger exporter
+	exporter, err := jaeger.New(
+		jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(config.JaegerEndpoint)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Jaeger exporter: %w", err)
+	}
+
+	// Create resource
+	res, err := resource.New(context.Background(),
+		resource.WithAttributes(
+			semconv.ServiceName(config.ServiceName),
+			semconv.ServiceVersion(config.ServiceVersion),
+			semconv.DeploymentEnvironment(config.Environment),
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource: %w", err)
+	}
+
+	// Create trace provider
+	tp := trace.NewTracerProvider(
+		trace.WithBatcher(exporter),
+		trace.WithResource(res),
+		trace.WithSampler(trace.TraceIDRatioBased(config.SampleRate)),
+	)
+
+	// Set global trace provider
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	return &TracingProvider{
+		config:   config,
+		provider: tp,
+		tracer:   tp.Tracer(config.ServiceName),
+	}, nil
+}
+
+// Tracer returns the OpenTelemetry tracer
+func (tp *TracingProvider) Tracer() oteltrace.Tracer {
+	return tp.tracer
+}
+
+// StartSpan starts a new span with the given name and context
+func (tp *TracingProvider) StartSpan(ctx context.Context, name string, opts ...oteltrace.SpanStartOption) (context.Context, oteltrace.Span) {
+	return tp.tracer.Start(ctx, name, opts...)
+}
+
+// AddSpanAttributes adds attributes to the current span
+func (tp *TracingProvider) AddSpanAttributes(span oteltrace.Span, attrs ...attribute.KeyValue) {
+	span.SetAttributes(attrs...)
+}
+
+// AddSpanEvent adds an event to the current span
+func (tp *TracingProvider) AddSpanEvent(span oteltrace.Span, name string, attrs ...attribute.KeyValue) {
+	span.AddEvent(name, oteltrace.WithAttributes(attrs...))
+}
+
+// RecordError records an error in the current span
+func (tp *TracingProvider) RecordError(span oteltrace.Span, err error) {
+	span.RecordError(err)
+	span.SetStatus(oteltrace.StatusCodeError, err.Error())
+}
+
+// Shutdown gracefully shuts down the tracing provider
+func (tp *TracingProvider) Shutdown(ctx context.Context) error {
+	if tp.provider != nil {
+		return tp.provider.Shutdown(ctx)
+	}
+	return nil
+}
+
+// TraceHTTPHandler creates a middleware for tracing HTTP requests
+func (tp *TracingProvider) TraceHTTPHandler(operationName string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx, span := tp.StartSpan(r.Context(), operationName)
+			defer span.End()
+
+			// Add request attributes
+			tp.AddSpanAttributes(span,
+				attribute.String("http.method", r.Method),
+				attribute.String("http.url", r.URL.String()),
+				attribute.String("http.scheme", r.URL.Scheme),
+				attribute.String("http.host", r.Host),
+				attribute.String("http.user_agent", r.UserAgent()),
+			)
+
+			// Create response writer wrapper to capture status code
+			wrapped := &responseWriter{ResponseWriter: w, statusCode: 200}
+
+			// Process request with tracing context
+			next.ServeHTTP(wrapped, r.WithContext(ctx))
+
+			// Add response attributes
+			tp.AddSpanAttributes(span,
+				attribute.Int("http.status_code", wrapped.statusCode),
+			)
+
+			// Set span status based on HTTP status code
+			if wrapped.statusCode >= 400 {
+				span.SetStatus(oteltrace.StatusCodeError, fmt.Sprintf("HTTP %d", wrapped.statusCode))
+			}
+		})
+	}
+}
+
+// responseWriter wraps http.ResponseWriter to capture status code
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+// DefaultTracingConfig returns a default tracing configuration
+func DefaultTracingConfig(serviceName string) *TracingConfig {
+	return &TracingConfig{
+		ServiceName:     serviceName,
+		ServiceVersion:  "1.0.0",
+		Environment:     "development",
+		JaegerEndpoint:  "http://localhost:14268/api/traces",
+		SampleRate:      1.0, // 100% sampling for development
+		Enabled:         true,
+	}
+}
+
+// InitializeTracing initializes OpenTelemetry tracing with default configuration
+func InitializeTracing(serviceName string) (*TracingProvider, error) {
+	config := DefaultTracingConfig(serviceName)
+	
+	// Override with environment variables if available
+	if endpoint := os.Getenv("JAEGER_ENDPOINT"); endpoint != "" {
+		config.JaegerEndpoint = endpoint
+	}
+	
+	if env := os.Getenv("ENVIRONMENT"); env != "" {
+		config.Environment = env
+	}
+	
+	if version := os.Getenv("SERVICE_VERSION"); version != "" {
+		config.ServiceVersion = version
+	}
+
+	provider, err := NewTracingProvider(config)
+	if err != nil {
+		log.Printf("Failed to initialize tracing: %v", err)
+		// Return a no-op provider instead of failing
+		return &TracingProvider{
+			config: &TracingConfig{Enabled: false},
+			tracer: otel.Tracer(serviceName),
+		}, nil
+	}
+
+	log.Printf("Tracing initialized for service: %s", serviceName)
+	return provider, nil
+}
