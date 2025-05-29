@@ -1,0 +1,463 @@
+workspace "BMAD-METHOD Template Health Endpoint" "Multi-tier template generator for production-ready health endpoint services" {
+
+    model {
+        # External actors and systems
+        developer = person "Developer" "Software developer who needs to create health endpoint services"
+        devOpsEngineer = person "DevOps Engineer" "Infrastructure engineer who deploys and manages services"
+        securityTeam = person "Security Team" "Security professionals who audit and monitor enterprise services"
+        complianceOfficer = person "Compliance Officer" "Ensures regulatory compliance for enterprise applications"
+        
+        # External systems
+        github = softwareSystem "GitHub" "Source code repository and CI/CD platform" "External"
+        kubernetes = softwareSystem "Kubernetes" "Container orchestration platform" "External"
+        prometheus = softwareSystem "Prometheus" "Metrics collection and monitoring" "External"
+        jaeger = softwareSystem "Jaeger" "Distributed tracing system" "External"
+        vault = softwareSystem "HashiCorp Vault" "Secrets management" "External"
+        
+        # Main system
+        templateSystem = softwareSystem "BMAD-METHOD Template System" "Multi-tier template generator for health endpoint services" {
+            
+            # CLI Application
+            cliTool = container "CLI Tool" "Command-line interface for template generation" "Go" {
+                generateCmd = component "Generate Command" "Generates new projects from templates" "Cobra Command"
+                migrateCmd = component "Migrate Command" "Migrates projects between tiers" "Cobra Command"
+                updateCmd = component "Update Command" "Updates existing projects" "Cobra Command"
+                customizeCmd = component "Customize Command" "Customizes template configurations" "Cobra Command"
+                templateCmd = component "Template Command" "Lists and validates templates" "Cobra Command"
+            }
+            
+            # Core Engine
+            templateEngine = container "Template Engine" "Core template processing and generation engine" "Go" {
+                generator = component "Project Generator" "Orchestrates project generation workflow" "Go Package"
+                templateProcessor = component "Template Processor" "Processes template files and variables" "Go Package"
+                configManager = component "Configuration Manager" "Manages tier-specific configurations" "Go Package"
+                fileManager = component "File Manager" "Handles file operations and directory structure" "Go Package"
+                validator = component "Template Validator" "Validates templates and generated projects" "Go Package"
+            }
+            
+            # Template Repository
+            templateRepo = container "Template Repository" "Static template files and configurations" "File System" {
+                basicTemplates = component "Basic Tier Templates" "Core health endpoint templates" "Go Templates"
+                intermediateTemplates = component "Intermediate Tier Templates" "Production-ready templates with monitoring" "Go Templates"
+                advancedTemplates = component "Advanced Tier Templates" "Full observability and event-driven templates" "Go Templates"
+                enterpriseTemplates = component "Enterprise Tier Templates" "Security, compliance, and audit templates" "Go Templates"
+                sharedComponents = component "Shared Components" "Common templates and utilities" "Go Templates"
+            }
+            
+            # Configuration System
+            configSystem = container "Configuration System" "Manages tier configurations and feature flags" "Go" {
+                tierConfig = component "Tier Configuration" "Defines features for each tier" "YAML/Go Structs"
+                featureFlags = component "Feature Flags" "Controls feature enablement" "Go Package"
+                defaults = component "Default Values" "Provides sensible defaults" "Go Package"
+                validation = component "Config Validation" "Validates configuration integrity" "Go Package"
+            }
+            
+            # Testing Framework
+            testingFramework = container "Testing Framework" "Comprehensive testing and validation" "Go/Gherkin" {
+                integrationTests = component "Integration Tests" "End-to-end template generation tests" "Bash/Go"
+                bddFramework = component "BDD Framework" "Behavior-driven testing with Godog" "Gherkin/Go"
+                templateTests = component "Template Tests" "Unit tests for template components" "Go"
+                validationSuite = component "Validation Suite" "Compilation and runtime validation" "Go"
+            }
+        }
+        
+        # Generated Applications (representing the output)
+        generatedApp = softwareSystem "Generated Health Service" "Production-ready health endpoint service generated by the template system" {
+            
+            # Basic Tier Application
+            basicApp = container "Basic Health Service" "Simple health endpoint with core functionality" "Go" {
+                healthHandler = component "Health Handler" "Basic health check endpoint" "Go HTTP Handler"
+                serverTimeHandler = component "Server Time Handler" "Current server time endpoint" "Go HTTP Handler"
+                healthModel = component "Health Model" "Health status data structures" "Go Structs"
+                server = component "HTTP Server" "HTTP server setup and routing" "Go HTTP Server"
+            }
+            
+            # Intermediate Tier Application
+            intermediateApp = container "Intermediate Health Service" "Production-ready service with monitoring" "Go" {
+                enhancedHealthHandler = component "Enhanced Health Handler" "Health checks with dependencies" "Go HTTP Handler"
+                dependencyChecker = component "Dependency Checker" "External dependency health validation" "Go Package"
+                metricsHandler = component "Metrics Handler" "Prometheus metrics endpoint" "Go HTTP Handler"
+                serverTimingMiddleware = component "Server Timing Middleware" "Performance timing headers" "Go Middleware"
+            }
+            
+            # Advanced Tier Application
+            advancedApp = container "Advanced Health Service" "Full observability and event-driven service" "Go" {
+                tracingHandler = component "Tracing Handler" "OpenTelemetry instrumented handlers" "Go HTTP Handler"
+                metricsCollector = component "Metrics Collector" "Custom metrics collection" "Go Package"
+                eventEmitter = component "Event Emitter" "CloudEvents emission" "Go Package"
+                observabilitySetup = component "Observability Setup" "OpenTelemetry configuration" "Go Package"
+            }
+            
+            # Enterprise Tier Application
+            enterpriseApp = container "Enterprise Health Service" "Mission-critical service with security and compliance" "Go" {
+                securityHandler = component "Security Handler" "mTLS and RBAC protected endpoints" "Go HTTP Handler"
+                auditLogger = component "Audit Logger" "Comprehensive security event logging" "Go Package"
+                rbacManager = component "RBAC Manager" "Role-based access control" "Go Package"
+                mtlsManager = component "mTLS Manager" "Mutual TLS certificate management" "Go Package"
+                complianceReporter = component "Compliance Reporter" "Regulatory compliance reporting" "Go Package"
+                securityContext = component "Security Context" "Request-scoped security information" "Go Package"
+            }
+            
+            # Kubernetes Deployment
+            k8sDeployment = container "Kubernetes Deployment" "Container orchestration and deployment" "Kubernetes" {
+                deployment = component "Deployment Manifest" "Pod deployment configuration" "YAML"
+                service = component "Service Manifest" "Service discovery configuration" "YAML"
+                ingress = component "Ingress Manifest" "External traffic routing" "YAML"
+                configMap = component "ConfigMap" "Application configuration" "YAML"
+                serviceMonitor = component "ServiceMonitor" "Prometheus monitoring configuration" "YAML"
+            }
+            
+            # TypeScript Client
+            typescriptClient = container "TypeScript Client SDK" "Type-safe client library for health service" "TypeScript" {
+                healthClient = component "Health Client" "Main client class for health endpoints" "TypeScript Class"
+                typeDefinitions = component "Type Definitions" "TypeScript interfaces and types" "TypeScript Interfaces"
+                apiMethods = component "API Methods" "Typed methods for each endpoint" "TypeScript Methods"
+                errorHandling = component "Error Handling" "Client-side error management" "TypeScript Classes"
+            }
+        }
+        
+        # Relationships - User interactions
+        developer -> templateSystem "Uses to generate health endpoint services"
+        devOpsEngineer -> templateSystem "Uses to create deployable services"
+        securityTeam -> templateSystem "Uses to generate secure enterprise services"
+        complianceOfficer -> templateSystem "Uses to ensure regulatory compliance"
+        
+        # Relationships - External system integrations
+        templateSystem -> github "Stores templates and generated examples"
+        generatedApp -> kubernetes "Deploys to"
+        generatedApp -> prometheus "Sends metrics to"
+        generatedApp -> jaeger "Sends traces to"
+        generatedApp -> vault "Retrieves secrets from"
+        
+        # Relationships - Template system internal
+        developer -> cliTool "Executes commands"
+        cliTool -> templateEngine "Orchestrates generation"
+        templateEngine -> templateRepo "Reads templates from"
+        templateEngine -> configSystem "Gets configuration from"
+        templateEngine -> generatedApp "Generates"
+        testingFramework -> templateEngine "Validates"
+        testingFramework -> generatedApp "Tests generated projects"
+        
+        # Relationships - CLI components
+        generateCmd -> generator "Invokes"
+        migrateCmd -> generator "Invokes for migration"
+        updateCmd -> generator "Invokes for updates"
+        customizeCmd -> configManager "Modifies configuration"
+        templateCmd -> validator "Validates templates"
+        
+        # Relationships - Template engine components
+        generator -> templateProcessor "Uses"
+        generator -> configManager "Gets configuration from"
+        generator -> fileManager "Creates files with"
+        templateProcessor -> templateRepo "Reads templates from"
+        configManager -> configSystem "Loads configuration from"
+        validator -> templateRepo "Validates"
+        
+        # Relationships - Configuration system
+        tierConfig -> featureFlags "Defines"
+        featureFlags -> defaults "Uses"
+        validation -> tierConfig "Validates"
+        
+        # Relationships - Template repository
+        generator -> basicTemplates "Uses for basic tier"
+        generator -> intermediateTemplates "Uses for intermediate tier"
+        generator -> advancedTemplates "Uses for advanced tier"
+        generator -> enterpriseTemplates "Uses for enterprise tier"
+        templateProcessor -> sharedComponents "Uses common components"
+        
+        # Relationships - Testing framework
+        integrationTests -> generator "Tests"
+        bddFramework -> templateEngine "Validates behavior"
+        templateTests -> templateRepo "Tests templates"
+        validationSuite -> generatedApp "Validates generated code"
+        
+        # Relationships - Generated application tiers
+        templateEngine -> basicApp "Generates basic tier"
+        templateEngine -> intermediateApp "Generates intermediate tier"
+        templateEngine -> advancedApp "Generates advanced tier"
+        templateEngine -> enterpriseApp "Generates enterprise tier"
+        templateEngine -> k8sDeployment "Generates Kubernetes manifests"
+        templateEngine -> typescriptClient "Generates TypeScript SDK"
+        
+        # Relationships - Basic tier components
+        server -> healthHandler "Routes requests to"
+        server -> serverTimeHandler "Routes requests to"
+        healthHandler -> healthModel "Uses"
+        
+        # Relationships - Intermediate tier components
+        server -> enhancedHealthHandler "Routes requests to"
+        server -> metricsHandler "Routes requests to"
+        server -> serverTimingMiddleware "Uses"
+        enhancedHealthHandler -> dependencyChecker "Uses"
+        enhancedHealthHandler -> healthModel "Uses"
+        
+        # Relationships - Advanced tier components
+        server -> tracingHandler "Routes requests to"
+        tracingHandler -> metricsCollector "Uses"
+        tracingHandler -> eventEmitter "Uses"
+        observabilitySetup -> tracingHandler "Configures"
+        eventEmitter -> prometheus "Sends events to"
+        
+        # Relationships - Enterprise tier components
+        server -> securityHandler "Routes requests to"
+        securityHandler -> rbacManager "Authorizes with"
+        securityHandler -> mtlsManager "Authenticates with"
+        securityHandler -> auditLogger "Logs events with"
+        securityHandler -> securityContext "Uses"
+        complianceReporter -> auditLogger "Reads events from"
+        
+        # Relationships - Kubernetes deployment
+        k8sDeployment -> kubernetes "Deploys to"
+        deployment -> service "Exposes via"
+        service -> ingress "Routes traffic through"
+        deployment -> configMap "Mounts configuration from"
+        serviceMonitor -> prometheus "Configures scraping for"
+        
+        # Relationships - TypeScript client
+        typescriptClient -> generatedApp "Calls APIs on"
+        healthClient -> apiMethods "Implements"
+        healthClient -> typeDefinitions "Uses"
+        healthClient -> errorHandling "Uses"
+        
+        # External system relationships
+        generatedApp -> github "Source code stored in"
+        k8sDeployment -> kubernetes "Managed by"
+        metricsCollector -> prometheus "Sends metrics to"
+        tracingHandler -> jaeger "Sends traces to"
+        mtlsManager -> vault "Retrieves certificates from"
+    }
+
+    views {
+        # System Context View
+        systemContext templateSystem "SystemContext" {
+            include *
+            autoLayout
+            title "BMAD-METHOD Template System - System Context"
+            description "High-level view of the template system and its users"
+        }
+        
+        # Container View - Template System
+        container templateSystem "TemplateSystemContainers" {
+            include *
+            autoLayout
+            title "BMAD-METHOD Template System - Container View"
+            description "Internal structure of the template generation system"
+        }
+        
+        # Container View - Generated Applications
+        container generatedApp "GeneratedAppContainers" {
+            include *
+            autoLayout
+            title "Generated Health Service - Container View"
+            description "Structure of generated health endpoint services across all tiers"
+        }
+        
+        # Component View - CLI Tool
+        component cliTool "CLIComponents" {
+            include *
+            autoLayout
+            title "CLI Tool - Component View"
+            description "Command structure of the template generation CLI"
+        }
+        
+        # Component View - Template Engine
+        component templateEngine "TemplateEngineComponents" {
+            include *
+            autoLayout
+            title "Template Engine - Component View"
+            description "Core template processing and generation components"
+        }
+        
+        # Component View - Template Repository
+        component templateRepo "TemplateRepoComponents" {
+            include *
+            autoLayout
+            title "Template Repository - Component View"
+            description "Organization of template files by tier"
+        }
+        
+        # Component View - Configuration System
+        component configSystem "ConfigSystemComponents" {
+            include *
+            autoLayout
+            title "Configuration System - Component View"
+            description "Tier configuration and feature flag management"
+        }
+        
+        # Component View - Testing Framework
+        component testingFramework "TestingFrameworkComponents" {
+            include *
+            autoLayout
+            title "Testing Framework - Component View"
+            description "Comprehensive testing and validation components"
+        }
+        
+        # Component View - Basic Tier Application
+        component basicApp "BasicAppComponents" {
+            include *
+            autoLayout
+            title "Basic Tier Application - Component View"
+            description "Components of a basic health endpoint service"
+        }
+        
+        # Component View - Intermediate Tier Application
+        component intermediateApp "IntermediateAppComponents" {
+            include *
+            autoLayout
+            title "Intermediate Tier Application - Component View"
+            description "Components of an intermediate health endpoint service with monitoring"
+        }
+        
+        # Component View - Advanced Tier Application
+        component advancedApp "AdvancedAppComponents" {
+            include *
+            autoLayout
+            title "Advanced Tier Application - Component View"
+            description "Components of an advanced health endpoint service with full observability"
+        }
+        
+        # Component View - Enterprise Tier Application
+        component enterpriseApp "EnterpriseAppComponents" {
+            include *
+            autoLayout
+            title "Enterprise Tier Application - Component View"
+            description "Components of an enterprise health endpoint service with security and compliance"
+        }
+        
+        # Component View - Kubernetes Deployment
+        component k8sDeployment "K8sDeploymentComponents" {
+            include *
+            autoLayout
+            title "Kubernetes Deployment - Component View"
+            description "Kubernetes manifests and deployment configuration"
+        }
+        
+        # Component View - TypeScript Client
+        component typescriptClient "TypeScriptClientComponents" {
+            include *
+            autoLayout
+            title "TypeScript Client SDK - Component View"
+            description "Generated TypeScript client library components"
+        }
+        
+        # Dynamic View - Template Generation Process
+        dynamic templateSystem "TemplateGeneration" "Template Generation Process" {
+            developer -> generateCmd "1. Executes generate command"
+            generateCmd -> generator "2. Invokes project generator"
+            generator -> configManager "3. Loads tier configuration"
+            configManager -> tierConfig "4. Reads tier settings"
+            generator -> templateProcessor "5. Processes templates"
+            templateProcessor -> enterpriseTemplates "6. Reads enterprise templates"
+            templateProcessor -> sharedComponents "7. Includes shared components"
+            generator -> fileManager "8. Creates project structure"
+            fileManager -> generatedApp "9. Generates enterprise health service"
+            generator -> validator "10. Validates generated project"
+            validator -> generatedApp "11. Compiles and tests"
+            autoLayout
+        }
+        
+        # Dynamic View - Enterprise Security Flow
+        dynamic enterpriseApp "EnterpriseSecurityFlow" "Enterprise Security Request Flow" {
+            developer -> securityHandler "1. Makes authenticated request"
+            securityHandler -> mtlsManager "2. Validates client certificate"
+            securityHandler -> rbacManager "3. Checks permissions"
+            securityHandler -> securityContext "4. Creates security context"
+            securityHandler -> auditLogger "5. Logs security event"
+            securityHandler -> healthHandler "6. Processes health check"
+            healthHandler -> securityHandler "7. Returns health status"
+            securityHandler -> developer "8. Returns response"
+            auditLogger -> complianceReporter "9. Aggregates for compliance"
+            autoLayout
+        }
+        
+        # Dynamic View - Observability Flow
+        dynamic advancedApp "ObservabilityFlow" "Advanced Tier Observability Flow" {
+            developer -> tracingHandler "1. Makes request"
+            tracingHandler -> observabilitySetup "2. Creates trace span"
+            tracingHandler -> metricsCollector "3. Records metrics"
+            tracingHandler -> healthHandler "4. Processes request"
+            healthHandler -> tracingHandler "5. Returns response"
+            tracingHandler -> eventEmitter "6. Emits health event"
+            metricsCollector -> prometheus "7. Sends metrics"
+            observabilitySetup -> jaeger "8. Sends trace"
+            eventEmitter -> prometheus "9. Sends event metrics"
+            autoLayout
+        }
+        
+        # Deployment View
+        deploymentEnvironment "Production" {
+            deploymentNode "Developer Workstation" {
+                containerInstance cliTool
+                containerInstance templateEngine
+                containerInstance templateRepo
+                containerInstance configSystem
+                containerInstance testingFramework
+            }
+            
+            deploymentNode "Kubernetes Cluster" {
+                deploymentNode "Control Plane" {
+                    infrastructureNode "API Server"
+                    infrastructureNode "etcd"
+                    infrastructureNode "Scheduler"
+                }
+                
+                deploymentNode "Worker Nodes" {
+                    containerInstance basicApp
+                    containerInstance intermediateApp
+                    containerInstance advancedApp
+                    containerInstance enterpriseApp
+                }
+                
+                deploymentNode "Monitoring Stack" {
+                    softwareSystemInstance prometheus
+                    softwareSystemInstance jaeger
+                }
+            }
+            
+            deploymentNode "External Services" {
+                softwareSystemInstance github
+                softwareSystemInstance vault
+            }
+            
+            deploymentNode "Client Applications" {
+                containerInstance typescriptClient
+            }
+        }
+
+        # Styles
+        styles {
+            element "Person" {
+                color #ffffff
+                fontSize 22
+                shape Person
+            }
+            element "External" {
+                background #999999
+                color #ffffff
+            }
+            element "Container" {
+                background #1168bd
+                color #ffffff
+            }
+            element "Component" {
+                background #85bbf0
+                color #000000
+            }
+            element "Infrastructure Node" {
+                background #ffffff
+                color #000000
+                shape Cylinder
+            }
+            relationship "Relationship" {
+                dashed false
+            }
+            relationship "Async" {
+                dashed true
+            }
+        }
+    }
+    
+    configuration {
+        scope softwaresystem
+    }
+}
