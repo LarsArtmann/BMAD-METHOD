@@ -1,5 +1,5 @@
 name: intermediate
-description: Intermediate tier health endpoint template
+description: Intermediate tier health endpoint template with dependency checks
 tier: intermediate
 features:
   kubernetes: true
@@ -7,4 +7,5 @@ features:
   docker: true
   opentelemetry: true
   cloudevents: false
+  dependencies: true
 version: "1.0.0"
