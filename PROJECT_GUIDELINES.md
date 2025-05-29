@@ -4,18 +4,24 @@
 
 This document consolidates all learnings, best practices, and guidelines from the BMAD Method implementation for the template-health-endpoint project. It serves as the definitive guide for AI agents and developers working on complex software development projects.
 
+**Last Updated**: 2024-05-29
+**Version**: 2.0
+**Status**: Comprehensive - Includes Dual Template System Learnings
+
 ## Table of Contents
 
 1. [BMAD Method Workflow](#bmad-method-workflow)
-2. [Development Principles](#development-principles)
-3. [Technical Architecture Guidelines](#technical-architecture-guidelines)
-4. [Code Quality Standards](#code-quality-standards)
-5. [Testing and Validation](#testing-and-validation)
-6. [Documentation Standards](#documentation-standards)
-7. [AI Agent Collaboration](#ai-agent-collaboration)
-8. [Technology Stack Guidelines](#technology-stack-guidelines)
-9. [Project Organization](#project-organization)
-10. [Quality Assurance](#quality-assurance)
+2. [Dual Template System Guidelines](#dual-template-system-guidelines)
+3. [Development Principles](#development-principles)
+4. [Technical Architecture Guidelines](#technical-architecture-guidelines)
+5. [Code Quality Standards](#code-quality-standards)
+6. [Testing and Validation](#testing-and-validation)
+7. [Documentation Standards](#documentation-standards)
+8. [AI Agent Collaboration](#ai-agent-collaboration)
+9. [Technology Stack Guidelines](#technology-stack-guidelines)
+10. [Project Organization](#project-organization)
+11. [Quality Assurance](#quality-assurance)
+12. [Template Development Standards](#template-development-standards)
 
 ---
 
@@ -26,7 +32,7 @@ This document consolidates all learnings, best practices, and guidelines from th
 For complex projects, follow the BMAD Method workflow:
 
 1. **Analyst Phase (Larry)**: Create comprehensive project brief with problem analysis
-2. **Product Manager Phase (John)**: Develop detailed PRD with epics and user stories  
+2. **Product Manager Phase (John)**: Develop detailed PRD with epics and user stories
 3. **Architect Phase (Mo)**: Design technical architecture and component structure
 4. **Product Owner Phase (PO)**: Validate requirements and create acceptance criteria
 5. **Scrum Master Phase**: Break epics into 5-task manageable stories
@@ -81,6 +87,93 @@ For complex projects, follow the BMAD Method workflow:
 - Validate deliverables against phase-specific checklists
 - Ensure all stakeholders approve before phase transition
 - Maintain comprehensive documentation throughout
+
+---
+
+## Dual Template System Guidelines
+
+### Core Architecture Principle
+
+**Always design template systems to serve both manual and automated workflows:**
+- **Static Templates**: Provide copyable template directories for manual customization
+- **CLI Tools**: Provide programmatic generation and update capabilities
+- **Integration**: Ensure both approaches work seamlessly together
+
+### Repository Structure Standard
+
+Follow established template-* repository patterns:
+```
+template-{name}/
+├── templates/           # Static template directories
+│   ├── basic/          # Users can copy these directly
+│   ├── intermediate/   # Production-ready template
+│   ├── advanced/       # Full observability template
+│   └── enterprise/     # Kubernetes & compliance template
+├── examples/            # Generated examples from templates
+├── scripts/             # Template operations
+├── cmd/                 # CLI tool
+│   └── generator/
+├── pkg/                 # Core logic
+└── docs/                # Documentation
+```
+
+### Template Variable Processing
+
+**Process template variables comprehensively across all relevant file types:**
+- **File Types**: `.tmpl`, `.go`, `.yaml`, `.yml`, `.json`, `.ts`, `.sh`, `go.mod`, `README.md`
+- **Variables**: Use Go template syntax with clear, descriptive names
+- **Validation**: Ensure all variables are properly substituted
+
+### Template Metadata Management
+
+**Include structured metadata for each template tier:**
+```yaml
+name: basic
+description: Basic tier health endpoint template
+tier: basic
+features:
+  kubernetes: true
+  typescript: true
+  docker: true
+  opentelemetry: false
+  cloudevents: false
+version: "1.0.0"
+```
+
+### CLI Command Structure
+
+**Use hierarchical command structure for complex template operations:**
+```bash
+tool-name generate          # Generate new project (embedded templates)
+tool-name template list     # List available static templates
+tool-name template from-static  # Generate from static template
+tool-name template validate # Validate template integrity
+tool-name update            # Update existing project
+tool-name migrate           # Migrate between tiers
+```
+
+### Progressive Complexity Design
+
+**Design template tiers with clear progression:**
+- **Basic**: Core functionality, minimal dependencies
+- **Intermediate**: Production features, basic observability
+- **Advanced**: Full observability, event-driven features
+- **Enterprise**: Compliance, security, multi-environment support
+
+### Template Quality Standards
+
+**Comprehensive Testing Strategy:**
+- Template Validation: Structure, metadata, required files
+- Generation Testing: Templates generate working projects
+- Compilation Testing: Generated projects compile successfully
+- Runtime Testing: Generated applications work correctly
+- Integration Testing: End-to-end workflow validation
+
+**User Experience Standards:**
+- Progress indicators during generation
+- Clear success confirmation with next steps
+- Actionable error messages
+- Comprehensive help text and examples
 
 ---
 
@@ -453,9 +546,114 @@ project/
 
 ---
 
+## Template Development Standards
+
+### Template Conversion Process
+
+**Systematic Approach for Converting CLI-Embedded Templates to Static Templates:**
+
+1. **Extract**: Generate projects using existing CLI/templates
+2. **Convert**: Replace hardcoded values with template variables
+   ```bash
+   # Example conversion
+   sed -e 's/hardcoded-name/{{.Config.Name}}/g' \
+       -e 's/hardcoded-module/{{.Config.GoModule}}/g'
+   ```
+3. **Validate**: Ensure templates work correctly
+4. **Document**: Add metadata and documentation
+5. **Test**: Comprehensive testing of generated projects
+
+### Template Variable Standards
+
+**Naming Conventions:**
+- Use descriptive, clear variable names: `{{.Config.Name}}` not `{{.N}}`
+- Follow consistent naming patterns: `{{.Config.GoModule}}`, `{{.Config.Description}}`
+- Group related variables logically under namespaces
+- Provide sensible defaults where possible
+
+**Processing Requirements:**
+```go
+// Check if file needs template processing
+if filepath.Ext(inputPath) == ".tmpl" ||
+   filepath.Base(inputPath) == "go.mod" ||
+   filepath.Base(inputPath) == "README.md" ||
+   filepath.Ext(inputPath) == ".go" ||
+   filepath.Ext(inputPath) == ".yaml" ||
+   filepath.Ext(inputPath) == ".yml" ||
+   filepath.Ext(inputPath) == ".json" ||
+   filepath.Ext(inputPath) == ".ts" ||
+   filepath.Ext(inputPath) == ".sh" {
+    // Process as template with variable substitution
+} else {
+    // Copy file as-is
+}
+```
+
+### CLI Development Standards
+
+**Command Structure:**
+- Use established CLI frameworks (Cobra for Go)
+- Implement hierarchical command structure for complex operations
+- Provide comprehensive help text and examples
+- Support both interactive and non-interactive modes
+- Include dry-run options for safe testing
+
+**Error Handling:**
+- Provide clear, actionable error messages
+- Include context about what went wrong and how to fix it
+- Validate inputs early and provide immediate feedback
+- Log detailed information for debugging while keeping user output clean
+
+**User Experience:**
+```
+🚀 Generating project from basic template...
+📋 Using template: Basic tier health endpoint template (1.0.0)
+✅ Successfully generated project from basic template!
+📁 Project created in: my-project
+```
+
+### Template Quality Assurance
+
+**Validation Checklist:**
+- [ ] Template metadata is valid and complete
+- [ ] All required files exist in template directories
+- [ ] Template variables are properly defined and used
+- [ ] Generated projects compile without errors
+- [ ] All endpoints/functionality work as expected
+- [ ] Documentation is comprehensive and accurate
+- [ ] Tests cover all template tiers and scenarios
+
+**Performance Standards:**
+- Template generation should complete in reasonable time
+- CLI operations should provide progress feedback for long operations
+- Template processing should be efficient for large projects
+- Memory usage should be reasonable for template operations
+
+**Security Considerations:**
+- Validate all user inputs to prevent injection attacks
+- Sanitize template variables to prevent code injection
+- Use secure defaults for generated configurations
+- Include security best practices in generated code
+
+### Maintenance Guidelines
+
+**Version Management:**
+- Use semantic versioning for template versions
+- Maintain compatibility matrices between template versions
+- Provide migration guides for breaking changes
+- Test template updates thoroughly before release
+
+**Community Contributions:**
+- Provide clear contribution guidelines
+- Include templates for new template tiers
+- Maintain consistent code quality standards
+- Document the template development process
+
+---
+
 ## Conclusion
 
-These guidelines represent the consolidated wisdom from successful implementation of complex software projects using the BMAD Method. They provide a systematic approach to software development that ensures quality, maintainability, and successful outcomes.
+These guidelines represent the consolidated wisdom from successful implementation of complex software projects using the BMAD Method, including advanced dual template system development. They provide a systematic approach to software development that ensures quality, maintainability, and successful outcomes.
 
 **Key Success Factors**:
 1. **Systematic Approach**: Follow BMAD Method for complex projects
