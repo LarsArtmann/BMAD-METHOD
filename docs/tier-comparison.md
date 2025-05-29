@@ -29,11 +29,16 @@ The BMAD Method Template Health Endpoint Generator provides four progressive tie
 |---------|-------|--------------|----------|------------|
 | Go Server Implementation | ✅ | ✅ | ✅ | ✅ |
 | TypeScript Client SDK | ✅ | ✅ | ✅ | ✅ |
+| gRPC Support | ❌ | ❌ | ✅ | ✅ |
 | Docker Containerization | ✅ | ✅ | ✅ | ✅ |
 | Kubernetes Manifests | ✅ | ✅ | ✅ | ✅ |
 | Health Probes (K8s) | ✅ | ✅ | ✅ | ✅ |
 | ServiceMonitor (Prometheus) | ❌ | ❌ | ✅ | ✅ |
 | Ingress Configuration | ❌ | ❌ | ✅ | ✅ |
+| Gateway API | ❌ | ❌ | ✅ | ✅ |
+| API Documentation (OpenAPI) | ✅ | ✅ | ✅ | ✅ |
+| API Versioning | ❌ | ✅ | ✅ | ✅ |
+| Blue/Green Deployment | ❌ | ❌ | ✅ | ✅ |
 | Multi-Environment Config | ❌ | ❌ | ❌ | ✅ |
 
 ### Observability & Monitoring
@@ -47,6 +52,7 @@ The BMAD Method Template Health Endpoint Generator provides four progressive tie
 | CloudEvents Emission | ❌ | ❌ | ✅ | ✅ |
 | Custom Metrics | ❌ | ❌ | ✅ | ✅ |
 | Distributed Tracing | ❌ | ❌ | ✅ | ✅ |
+| Health Check Webhooks | ❌ | ❌ | ✅ | ✅ |
 
 ### Dependency Management
 | Feature | Basic | Intermediate | Advanced | Enterprise |
@@ -58,14 +64,23 @@ The BMAD Method Template Health Endpoint Generator provides four progressive tie
 | Memory Usage Monitoring | ❌ | ✅ | ✅ | ✅ |
 | Circuit Breaker Pattern | ❌ | ❌ | ✅ | ✅ |
 | Retry Mechanisms | ❌ | ❌ | ✅ | ✅ |
+| HTTP Native Streaming | ✅ | ✅ | ✅ | ✅ |
+| WebSocket Support | ❌ | ❌ | ✅ | ✅ |
+| Caching Layer (Redis/Memcached) | ❌ | ✅ | ✅ | ✅ |
+| Message Queue Integration | ❌ | ❌ | ✅ | ✅ |
+| Custom Health Check Plugins | ❌ | ❌ | ✅ | ✅ |
 
 ### Security & Compliance
 | Feature | Basic | Intermediate | Advanced | Enterprise |
 |---------|-------|--------------|----------|------------|
 | Basic Security Headers | ✅ | ✅ | ✅ | ✅ |
 | TLS/HTTPS Support | ✅ | ✅ | ✅ | ✅ |
+| HTTP/1.1 Support | ✅ | ✅ | ✅ | ✅ |
+| HTTP/2 Support | ❌ | ✅ | ✅ | ✅ |
+| HTTP/3 Support | ❌ | ❌ | ✅ | ✅ |
 | mTLS Support | ❌ | ❌ | ❌ | ✅ |
 | RBAC Integration | ❌ | ❌ | ❌ | ✅ |
+| Rate Limiting | ❌ | ✅ | ✅ | ✅ |
 | Audit Logging | ❌ | ❌ | ❌ | ✅ |
 | Data Governance | ❌ | ❌ | ❌ | ✅ |
 | Compliance Reporting | ❌ | ❌ | ❌ | ✅ |
