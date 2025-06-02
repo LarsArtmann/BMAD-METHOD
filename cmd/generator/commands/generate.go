@@ -45,6 +45,12 @@ Available tiers:
   enterprise   - Enterprise-grade with compliance features (~45 min deployment)
 
 Examples:
+  # Interactive wizard (recommended for new users)
+  template-health-endpoint generate --interactive
+
+  # Quick generation with smart defaults
+  template-health-endpoint generate --name my-service
+
   # Generate a basic health service
   template-health-endpoint generate --name my-service --tier basic
 
@@ -75,15 +81,31 @@ func init() {
 	generateCmd.Flags().StringVarP(&configFile, "config", "c", "", "configuration file path")
 	generateCmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "interactive mode with prompts")
 
-	// Mark required flags
-	generateCmd.MarkFlagRequired("name")
+	// Mark name as required only when not using interactive mode
+	// This will be validated in the command logic
 }
 
 func runGenerate(cmd *cobra.Command, args []string) error {
-	// Load configuration
-	cfg, err := loadConfiguration()
-	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+	var cfg *config.ProjectConfig
+	var err error
+
+	// Use interactive wizard if requested or if minimal flags provided
+	if interactive || (projectName == "" && configFile == "") {
+		cfg, err = InteractiveWizard()
+		if err != nil {
+			return fmt.Errorf("interactive wizard failed: %w", err)
+		}
+	} else {
+		// Validate required flags for non-interactive mode
+		if projectName == "" && configFile == "" {
+			return fmt.Errorf("project name is required when not using interactive mode. Use --interactive or provide --name")
+		}
+		
+		// Load configuration from flags/config file
+		cfg, err = loadConfiguration()
+		if err != nil {
+			return fmt.Errorf("failed to load configuration: %w", err)
+		}
 	}
 
 	// Validate configuration

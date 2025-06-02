@@ -1,0 +1,282 @@
+groups:
+- name: {{.Config.Name}}-health-alerts
+  rules:
+  # Service availability alerts
+  - alert: ServiceDown
+    expr: up{job="{{.Config.Name}}"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+    annotations:
+      summary: "{{.Config.Name}} service is down"
+      description: "{{.Config.Name}} service has been down for more than 1 minute"
+      runbook_url: "https://runbooks.example.com/{{.Config.Name}}/service-down"
+
+  - alert: HighErrorRate
+    expr: |
+      (
+        rate(http_requests_total{job="{{.Config.Name}}", status_code=~"5.."}[5m]) /
+        rate(http_requests_total{job="{{.Config.Name}}"}[5m])
+      ) > 0.05
+    for: 5m
+    labels:
+      severity: warning
+      service: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+    annotations:
+      summary: "High error rate for {{.Config.Name}}"
+      description: "Error rate is {% raw %}{{ $value | humanizePercentage }}{% endraw %} for {{.Config.Name}}"
+      runbook_url: "https://runbooks.example.com/{{.Config.Name}}/high-error-rate"
+
+  - alert: CriticalErrorRate
+    expr: |
+      (
+        rate(http_requests_total{job="{{.Config.Name}}", status_code=~"5.."}[5m]) /
+        rate(http_requests_total{job="{{.Config.Name}}"}[5m])
+      ) > 0.20
+    for: 2m
+    labels:
+      severity: critical
+      service: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+    annotations:
+      summary: "Critical error rate for {{.Config.Name}}"
+      description: "Error rate is {% raw %}{{ $value | humanizePercentage }}{% endraw %} for {{.Config.Name}}"
+      runbook_url: "https://runbooks.example.com/{{.Config.Name}}/critical-error-rate"
+
+  # Response time alerts
+  - alert: HighResponseTime
+    expr: |
+      histogram_quantile(0.95, 
+        rate(http_request_duration_seconds_bucket{job="{{.Config.Name}}"}[5m])
+      ) > 0.5
+    for: 10m
+    labels:
+      severity: warning
+      service: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+    annotations:
+      summary: "High response time for {{.Config.Name}}"
+      description: "95th percentile response time is {% raw %}{{ $value }}{% endraw %}s for {{.Config.Name}}"
+      runbook_url: "https://runbooks.example.com/{{.Config.Name}}/high-response-time"
+
+  - alert: VeryHighResponseTime
+    expr: |
+      histogram_quantile(0.95, 
+        rate(http_request_duration_seconds_bucket{job="{{.Config.Name}}"}[5m])
+      ) > 2.0
+    for: 5m
+    labels:
+      severity: critical
+      service: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+    annotations:
+      summary: "Very high response time for {{.Config.Name}}"
+      description: "95th percentile response time is {% raw %}{{ $value }}{% endraw %}s for {{.Config.Name}}"
+      runbook_url: "https://runbooks.example.com/{{.Config.Name}}/very-high-response-time"
+
+  # Health check alerts
+  - alert: HealthCheckFailing
+    expr: |
+      rate(health_checks_total{job="{{.Config.Name}}", status!="healthy"}[5m]) > 0
+    for: 3m
+    labels:
+      severity: warning
+      service: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+    annotations:
+      summary: "Health checks failing for {{.Config.Name}}"
+      description: "Health check {% raw %}{{ $labels.check_name }}{% endraw %} is failing for {{.Config.Name}}"
+      runbook_url: "https://runbooks.example.com/{{.Config.Name}}/health-check-failing"
+
+{{- if ne .Config.Tier "basic"}}
+  # Dependency alerts (for intermediate+ tiers)
+  - alert: DependencyDown
+    expr: |
+      rate(dependency_checks_total{job="{{.Config.Name}}", status="unhealthy"}[5m]) > 0
+    for: 2m
+    labels:
+      severity: warning
+      service: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+    annotations:
+      summary: "Dependency down for {{.Config.Name}}"
+      description: "Dependency {% raw %}{{ $labels.dependency }}{% endraw %} is down for {{.Config.Name}}"
+      runbook_url: "https://runbooks.example.com/{{.Config.Name}}/dependency-down"
+{{- end}}
+
+{{- if or (eq .Config.Tier "advanced") (eq .Config.Tier "enterprise")}}
+  # Resource usage alerts (for advanced+ tiers)
+  - alert: HighMemoryUsage
+    expr: |
+      (
+        go_memory_usage_bytes{job="{{.Config.Name}}", type="alloc"} /
+        go_memory_usage_bytes{job="{{.Config.Name}}", type="sys"}
+      ) > 0.85
+    for: 10m
+    labels:
+      severity: warning
+      service: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+    annotations:
+      summary: "High memory usage for {{.Config.Name}}"
+      description: "Memory usage is {% raw %}{{ $value | humanizePercentage }}{% endraw %} for {{.Config.Name}}"
+      runbook_url: "https://runbooks.example.com/{{.Config.Name}}/high-memory-usage"
+
+  - alert: HighGoroutineCount
+    expr: go_goroutines{job="{{.Config.Name}}"} > 1000
+    for: 15m
+    labels:
+      severity: warning
+      service: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+    annotations:
+      summary: "High goroutine count for {{.Config.Name}}"
+      description: "Goroutine count is {% raw %}{{ $value }}{% endraw %} for {{.Config.Name}}"
+      runbook_url: "https://runbooks.example.com/{{.Config.Name}}/high-goroutine-count"
+
+  - alert: FrequentGC
+    expr: |
+      rate(go_gc_cycles_total{job="{{.Config.Name}}"}[5m]) > 2
+    for: 10m
+    labels:
+      severity: warning
+      service: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+    annotations:
+      summary: "Frequent garbage collection for {{.Config.Name}}"
+      description: "GC rate is {% raw %}{{ $value }}{% endraw %} cycles/second for {{.Config.Name}}"
+      runbook_url: "https://runbooks.example.com/{{.Config.Name}}/frequent-gc"
+{{- end}}
+
+{{- if eq .Config.Tier "enterprise"}}
+  # Security alerts (for enterprise tier)
+  - alert: UnauthorizedAccess
+    expr: |
+      rate(http_requests_total{job="{{.Config.Name}}", status_code="401"}[5m]) > 0.1
+    for: 5m
+    labels:
+      severity: warning
+      service: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+      category: security
+    annotations:
+      summary: "High unauthorized access rate for {{.Config.Name}}"
+      description: "Unauthorized access rate is {% raw %}{{ $value }}{% endraw %}/second for {{.Config.Name}}"
+      runbook_url: "https://runbooks.example.com/{{.Config.Name}}/unauthorized-access"
+
+  - alert: SuspiciousActivity
+    expr: |
+      rate(http_requests_total{job="{{.Config.Name}}", status_code="403"}[5m]) > 0.05
+    for: 5m
+    labels:
+      severity: warning
+      service: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+      category: security
+    annotations:
+      summary: "Suspicious activity detected for {{.Config.Name}}"
+      description: "Forbidden access rate is {% raw %}{{ $value }}{% endraw %}/second for {{.Config.Name}}"
+      runbook_url: "https://runbooks.example.com/{{.Config.Name}}/suspicious-activity"
+{{- end}}
+
+- name: {{.Config.Name}}-slo-alerts
+  rules:
+  # SLO-based alerts
+  - alert: SLOErrorBudgetExhausted
+    expr: |
+      (
+        1 - (
+          sum(rate(http_requests_total{job="{{.Config.Name}}", status_code!~"5.."}[30d])) /
+          sum(rate(http_requests_total{job="{{.Config.Name}}"}[30d]))
+        )
+      ) > 0.001  # 99.9% availability SLO
+    for: 0m
+    labels:
+      severity: critical
+      service: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+      slo: availability
+    annotations:
+      summary: "SLO error budget exhausted for {{.Config.Name}}"
+      description: "30-day error budget has been exhausted for {{.Config.Name}} availability SLO"
+      runbook_url: "https://runbooks.example.com/{{.Config.Name}}/slo-error-budget-exhausted"
+
+  - alert: SLOErrorBudgetBurnRate
+    expr: |
+      (
+        1 - (
+          sum(rate(http_requests_total{job="{{.Config.Name}}", status_code!~"5.."}[1h])) /
+          sum(rate(http_requests_total{job="{{.Config.Name}}"}[1h]))
+        )
+      ) > 0.014  # 14x burn rate (exhausts budget in ~2 days)
+    for: 2m
+    labels:
+      severity: critical
+      service: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+      slo: availability
+    annotations:
+      summary: "High SLO error budget burn rate for {{.Config.Name}}"
+      description: "Error budget is burning at 14x normal rate for {{.Config.Name}}"
+      runbook_url: "https://runbooks.example.com/{{.Config.Name}}/high-burn-rate"
+
+  - alert: SLOLatencyBudgetExhausted
+    expr: |
+      histogram_quantile(0.99, 
+        rate(http_request_duration_seconds_bucket{job="{{.Config.Name}}"}[30d])
+      ) > 0.1  # 100ms 99th percentile SLO
+    for: 0m
+    labels:
+      severity: critical
+      service: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+      slo: latency
+    annotations:
+      summary: "SLO latency budget exhausted for {{.Config.Name}}"
+      description: "30-day latency SLO budget has been exhausted for {{.Config.Name}}"
+      runbook_url: "https://runbooks.example.com/{{.Config.Name}}/latency-slo-exhausted"
+
+- name: {{.Config.Name}}-recording-rules
+  interval: 30s
+  rules:
+  # SLI recording rules
+  - record: {{.Config.Name}}:availability_sli
+    expr: |
+      sum(rate(http_requests_total{job="{{.Config.Name}}", status_code!~"5.."}[5m])) /
+      sum(rate(http_requests_total{job="{{.Config.Name}}"}[5m]))
+
+  - record: {{.Config.Name}}:latency_sli_p99
+    expr: |
+      histogram_quantile(0.99, 
+        rate(http_request_duration_seconds_bucket{job="{{.Config.Name}}"}[5m])
+      )
+
+  - record: {{.Config.Name}}:latency_sli_p95
+    expr: |
+      histogram_quantile(0.95, 
+        rate(http_request_duration_seconds_bucket{job="{{.Config.Name}}"}[5m])
+      )
+
+  - record: {{.Config.Name}}:latency_sli_p50
+    expr: |
+      histogram_quantile(0.50, 
+        rate(http_request_duration_seconds_bucket{job="{{.Config.Name}}"}[5m])
+      )
+
+  # Error budget recording rules
+  - record: {{.Config.Name}}:error_budget_remaining_30d
+    expr: |
+      1 - (
+        (1 - sum(rate(http_requests_total{job="{{.Config.Name}}", status_code!~"5.."}[30d])) /
+         sum(rate(http_requests_total{job="{{.Config.Name}}"}[30d]))) / 0.001
+      )
+
+  # Throughput recording rules
+  - record: {{.Config.Name}}:request_rate
+    expr: sum(rate(http_requests_total{job="{{.Config.Name}}"}[5m]))
+
+  - record: {{.Config.Name}}:error_rate
+    expr: sum(rate(http_requests_total{job="{{.Config.Name}}", status_code=~"5.."}[5m]))

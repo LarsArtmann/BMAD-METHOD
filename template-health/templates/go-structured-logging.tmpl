@@ -1,0 +1,314 @@
+package observability
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+	"time"
+
+	"go.opentelemetry.io/otel/trace"
+)
+
+// LogLevel represents different log levels
+type LogLevel string
+
+const (
+	LogLevelDebug LogLevel = "debug"
+	LogLevelInfo  LogLevel = "info"
+	LogLevelWarn  LogLevel = "warn"
+	LogLevelError LogLevel = "error"
+)
+
+// StructuredLogger provides structured logging with OpenTelemetry integration
+type StructuredLogger struct {
+	logger      *slog.Logger
+	serviceName string
+	version     string
+	environment string
+}
+
+// LoggerConfig holds configuration for the structured logger
+type LoggerConfig struct {
+	ServiceName string
+	Version     string
+	Environment string
+	Level       LogLevel
+	Format      string // "json" or "text"
+	Output      string // "stdout", "stderr", or file path
+}
+
+// NewStructuredLogger creates a new structured logger
+func NewStructuredLogger(config LoggerConfig) (*StructuredLogger, error) {
+	// Set default values
+	if config.Format == "" {
+		config.Format = "json"
+	}
+	if config.Level == "" {
+		config.Level = LogLevelInfo
+	}
+	if config.Output == "" {
+		config.Output = "stdout"
+	}
+
+	// Configure log level
+	var level slog.Level
+	switch config.Level {
+	case LogLevelDebug:
+		level = slog.LevelDebug
+	case LogLevelInfo:
+		level = slog.LevelInfo
+	case LogLevelWarn:
+		level = slog.LevelWarn
+	case LogLevelError:
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo
+	}
+
+	// Configure output
+	var output *os.File
+	switch config.Output {
+	case "stdout":
+		output = os.Stdout
+	case "stderr":
+		output = os.Stderr
+	default:
+		// File output
+		file, err := os.OpenFile(config.Output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open log file: %w", err)
+		}
+		output = file
+	}
+
+	// Configure handler
+	var handler slog.Handler
+	opts := &slog.HandlerOptions{
+		Level: level,
+		AddSource: true,
+	}
+
+	switch config.Format {
+	case "json":
+		handler = slog.NewJSONHandler(output, opts)
+	case "text":
+		handler = slog.NewTextHandler(output, opts)
+	default:
+		handler = slog.NewJSONHandler(output, opts)
+	}
+
+	// Create logger with service context
+	logger := slog.New(handler).With(
+		"service", config.ServiceName,
+		"version", config.Version,
+		"environment", config.Environment,
+	)
+
+	return &StructuredLogger{
+		logger:      logger,
+		serviceName: config.ServiceName,
+		version:     config.Version,
+		environment: config.Environment,
+	}, nil
+}
+
+// WithContext adds OpenTelemetry trace information to the logger
+func (l *StructuredLogger) WithContext(ctx context.Context) *slog.Logger {
+	span := trace.SpanFromContext(ctx)
+	if !span.IsRecording() {
+		return l.logger
+	}
+
+	spanContext := span.SpanContext()
+	return l.logger.With(
+		"trace_id", spanContext.TraceID().String(),
+		"span_id", spanContext.SpanID().String(),
+	)
+}
+
+// WithFields adds custom fields to the logger
+func (l *StructuredLogger) WithFields(fields map[string]interface{}) *slog.Logger {
+	args := make([]interface{}, 0, len(fields)*2)
+	for k, v := range fields {
+		args = append(args, k, v)
+	}
+	return l.logger.With(args...)
+}
+
+// Debug logs a debug message
+func (l *StructuredLogger) Debug(ctx context.Context, msg string, fields ...interface{}) {
+	l.WithContext(ctx).Debug(msg, fields...)
+}
+
+// Info logs an info message
+func (l *StructuredLogger) Info(ctx context.Context, msg string, fields ...interface{}) {
+	l.WithContext(ctx).Info(msg, fields...)
+}
+
+// Warn logs a warning message
+func (l *StructuredLogger) Warn(ctx context.Context, msg string, fields ...interface{}) {
+	l.WithContext(ctx).Warn(msg, fields...)
+}
+
+// Error logs an error message
+func (l *StructuredLogger) Error(ctx context.Context, msg string, err error, fields ...interface{}) {
+	allFields := append(fields, "error", err.Error())
+	l.WithContext(ctx).Error(msg, allFields...)
+}
+
+// LogHTTPRequest logs HTTP request information
+func (l *StructuredLogger) LogHTTPRequest(ctx context.Context, method, path string, statusCode int, duration time.Duration, userAgent string) {
+	l.WithContext(ctx).Info("HTTP request",
+		"method", method,
+		"path", path,
+		"status_code", statusCode,
+		"duration_ms", duration.Milliseconds(),
+		"user_agent", userAgent,
+	)
+}
+
+// LogHealthCheck logs health check results
+func (l *StructuredLogger) LogHealthCheck(ctx context.Context, checkName string, status string, duration time.Duration, err error) {
+	fields := []interface{}{
+		"check_name", checkName,
+		"status", status,
+		"duration_ms", duration.Milliseconds(),
+	}
+
+	if err != nil {
+		fields = append(fields, "error", err.Error())
+		l.WithContext(ctx).Error("Health check failed", fields...)
+	} else {
+		l.WithContext(ctx).Info("Health check completed", fields...)
+	}
+}
+
+// LogDependencyCheck logs dependency health check results
+func (l *StructuredLogger) LogDependencyCheck(ctx context.Context, dependency string, status string, responseTime time.Duration, err error) {
+	fields := []interface{}{
+		"dependency", dependency,
+		"status", status,
+		"response_time_ms", responseTime.Milliseconds(),
+	}
+
+	if err != nil {
+		fields = append(fields, "error", err.Error())
+		l.WithContext(ctx).Warn("Dependency check failed", fields...)
+	} else {
+		l.WithContext(ctx).Info("Dependency check completed", fields...)
+	}
+}
+
+// LogStartup logs application startup information
+func (l *StructuredLogger) LogStartup(ctx context.Context, port int, startupDuration time.Duration) {
+	l.WithContext(ctx).Info("Application started",
+		"port", port,
+		"startup_duration_ms", startupDuration.Milliseconds(),
+	)
+}
+
+// LogShutdown logs application shutdown information
+func (l *StructuredLogger) LogShutdown(ctx context.Context, reason string, shutdownDuration time.Duration) {
+	l.WithContext(ctx).Info("Application shutting down",
+		"reason", reason,
+		"shutdown_duration_ms", shutdownDuration.Milliseconds(),
+	)
+}
+
+// LogPerformanceMetric logs performance metrics
+func (l *StructuredLogger) LogPerformanceMetric(ctx context.Context, metricName string, value float64, unit string, tags map[string]string) {
+	fields := []interface{}{
+		"metric_name", metricName,
+		"value", value,
+		"unit", unit,
+	}
+
+	for k, v := range tags {
+		fields = append(fields, fmt.Sprintf("tag_%s", k), v)
+	}
+
+	l.WithContext(ctx).Info("Performance metric", fields...)
+}
+
+// LogSecurityEvent logs security-related events
+func (l *StructuredLogger) LogSecurityEvent(ctx context.Context, eventType string, userID string, resource string, action string, result string) {
+	l.WithContext(ctx).Info("Security event",
+		"event_type", eventType,
+		"user_id", userID,
+		"resource", resource,
+		"action", action,
+		"result", result,
+		"timestamp", time.Now().UTC(),
+	)
+}
+
+// LogBusinessEvent logs business logic events
+func (l *StructuredLogger) LogBusinessEvent(ctx context.Context, eventType string, entityID string, data map[string]interface{}) {
+	fields := []interface{}{
+		"event_type", eventType,
+		"entity_id", entityID,
+	}
+
+	for k, v := range data {
+		fields = append(fields, k, v)
+	}
+
+	l.WithContext(ctx).Info("Business event", fields...)
+}
+
+// DefaultLogger provides a default logger instance
+var DefaultLogger *StructuredLogger
+
+// InitializeDefaultLogger initializes the default logger
+func InitializeDefaultLogger(serviceName, version, environment string) error {
+	config := LoggerConfig{
+		ServiceName: serviceName,
+		Version:     version,
+		Environment: environment,
+		Level:       LogLevel(getEnvWithDefault("LOG_LEVEL", string(LogLevelInfo))),
+		Format:      getEnvWithDefault("LOG_FORMAT", "json"),
+		Output:      getEnvWithDefault("LOG_OUTPUT", "stdout"),
+	}
+
+	logger, err := NewStructuredLogger(config)
+	if err != nil {
+		return err
+	}
+
+	DefaultLogger = logger
+	return nil
+}
+
+// getEnvWithDefault gets an environment variable with a default value
+func getEnvWithDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+// Convenience functions using the default logger
+func Debug(ctx context.Context, msg string, fields ...interface{}) {
+	if DefaultLogger != nil {
+		DefaultLogger.Debug(ctx, msg, fields...)
+	}
+}
+
+func Info(ctx context.Context, msg string, fields ...interface{}) {
+	if DefaultLogger != nil {
+		DefaultLogger.Info(ctx, msg, fields...)
+	}
+}
+
+func Warn(ctx context.Context, msg string, fields ...interface{}) {
+	if DefaultLogger != nil {
+		DefaultLogger.Warn(ctx, msg, fields...)
+	}
+}
+
+func Error(ctx context.Context, msg string, err error, fields ...interface{}) {
+	if DefaultLogger != nil {
+		DefaultLogger.Error(ctx, msg, err, fields...)
+	}
+}

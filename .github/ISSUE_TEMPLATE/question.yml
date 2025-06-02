@@ -1,0 +1,92 @@
+name: Question
+description: Ask a question about BMAD Method
+title: "[Question]: "
+labels: ["question", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your question! 🤔
+        
+        Before asking, please check:
+        - 📚 [Documentation](https://github.com/LarsArtmann/BMAD-METHOD#readme)
+        - 🔍 [Existing discussions](https://github.com/LarsArtmann/BMAD-METHOD/discussions)
+        - 🐛 [Known issues](https://github.com/LarsArtmann/BMAD-METHOD/issues)
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Question Category
+      description: What category does your question belong to?
+      options:
+        - Getting Started
+        - CLI Usage
+        - Template System
+        - TypeSpec Integration
+        - Configuration
+        - Deployment
+        - Troubleshooting
+        - Best Practices
+        - Contributing
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know?
+      placeholder: "I'm trying to understand how..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Provide any relevant context (what you're trying to achieve, your setup, etc.)
+      placeholder: "I'm working on a project where..."
+
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What Have You Tried?
+      description: What have you already attempted or researched?
+      placeholder: "I've tried..."
+
+  - type: input
+    id: version
+    attributes:
+      label: BMAD Method Version
+      description: What version are you using? (if applicable)
+      placeholder: "v1.0.0"
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: What operating system are you using? (if relevant)
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other
+        - Not applicable
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context that might be helpful.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true

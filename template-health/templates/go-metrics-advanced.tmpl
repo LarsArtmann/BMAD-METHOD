@@ -1,0 +1,487 @@
+package observability
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"runtime"
+	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
+	"go.opentelemetry.io/otel/exporters/prometheus"
+	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
+	"go.opentelemetry.io/otel/metric"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
+)
+
+// MetricsConfig holds configuration for OpenTelemetry metrics
+type MetricsConfig struct {
+	ServiceName      string
+	ServiceVersion   string
+	Environment      string
+	ExporterType     string // "prometheus", "otlp", "stdout", "noop"
+	PrometheusPort   int    // Port for Prometheus metrics endpoint
+	OTLPEndpoint     string
+	CollectionPeriod time.Duration
+	EnableRuntime    bool
+	ResourceAttrs    map[string]string
+}
+
+// MetricsProvider manages OpenTelemetry metrics
+type MetricsProvider struct {
+	provider       *sdkmetric.MeterProvider
+	meter          metric.Meter
+	config         MetricsConfig
+	promExporter   *prometheus.Exporter
+	
+	// Common metrics
+	httpRequestDuration    metric.Float64Histogram
+	httpRequestCount       metric.Int64Counter
+	httpActiveConnections  metric.Int64UpDownCounter
+	healthCheckDuration    metric.Float64Histogram
+	healthCheckCount       metric.Int64Counter
+	dependencyCheckDuration metric.Float64Histogram
+	dependencyCheckCount   metric.Int64Counter
+	runtimeMetrics         *RuntimeMetrics
+}
+
+// RuntimeMetrics holds runtime metric instruments
+type RuntimeMetrics struct {
+	goMemory       metric.Int64ObservableGauge
+	goGoroutines   metric.Int64ObservableGauge
+	goGCCount      metric.Int64ObservableCounter
+	goCPUTime      metric.Float64ObservableCounter
+	processMemory  metric.Int64ObservableGauge
+	processStartTime metric.Int64ObservableGauge
+}
+
+// NewMetricsProvider creates a new metrics provider
+func NewMetricsProvider(config MetricsConfig) (*MetricsProvider, error) {
+	// Set defaults
+	if config.CollectionPeriod == 0 {
+		config.CollectionPeriod = 15 * time.Second
+	}
+	if config.ExporterType == "" {
+		config.ExporterType = "prometheus"
+	}
+	if config.PrometheusPort == 0 {
+		config.PrometheusPort = 9090
+	}
+
+	// Create resource
+	res, err := resource.New(context.Background(),
+		resource.WithAttributes(
+			semconv.ServiceName(config.ServiceName),
+			semconv.ServiceVersion(config.ServiceVersion),
+			semconv.DeploymentEnvironment(config.Environment),
+		),
+		resource.WithHost(),
+		resource.WithProcess(),
+		resource.WithOS(),
+		resource.WithContainer(),
+		resource.WithFromEnv(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource: %w", err)
+	}
+
+	// Create exporter
+	exporter, promExporter, err := createMetricsExporter(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create metrics exporter: %w", err)
+	}
+
+	// Create meter provider
+	var options []sdkmetric.Option
+	options = append(options, sdkmetric.WithResource(res))
+	
+	if exporter != nil {
+		options = append(options, sdkmetric.WithReader(
+			sdkmetric.NewPeriodicReader(exporter,
+				sdkmetric.WithInterval(config.CollectionPeriod),
+			),
+		))
+	}
+
+	if promExporter != nil {
+		options = append(options, sdkmetric.WithReader(promExporter))
+	}
+
+	mp := sdkmetric.NewMeterProvider(options...)
+
+	// Set global meter provider
+	otel.SetMeterProvider(mp)
+
+	// Create meter
+	meter := mp.Meter(config.ServiceName)
+
+	// Create metrics provider
+	provider := &MetricsProvider{
+		provider:     mp,
+		meter:        meter,
+		config:       config,
+		promExporter: promExporter,
+	}
+
+	// Initialize common metrics
+	err = provider.initializeMetrics()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize metrics: %w", err)
+	}
+
+	// Initialize runtime metrics if enabled
+	if config.EnableRuntime {
+		err = provider.initializeRuntimeMetrics()
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize runtime metrics: %w", err)
+		}
+	}
+
+	return provider, nil
+}
+
+// createMetricsExporter creates the appropriate metrics exporter
+func createMetricsExporter(config MetricsConfig) (sdkmetric.Exporter, *prometheus.Exporter, error) {
+	switch config.ExporterType {
+	case "prometheus":
+		promExporter, err := prometheus.New()
+		if err != nil {
+			return nil, nil, err
+		}
+		return nil, promExporter, nil
+
+	case "otlp":
+		endpoint := config.OTLPEndpoint
+		if endpoint == "" {
+			endpoint = "http://localhost:4318/v1/metrics"
+		}
+		exporter, err := otlpmetrichttp.New(context.Background(),
+			otlpmetrichttp.WithEndpoint(endpoint),
+			otlpmetrichttp.WithInsecure(),
+		)
+		return exporter, nil, err
+
+	case "stdout":
+		exporter, err := stdoutmetric.New()
+		return exporter, nil, err
+
+	case "noop":
+		return &noopMetricsExporter{}, nil, nil
+
+	default:
+		return nil, nil, fmt.Errorf("unsupported exporter type: %s", config.ExporterType)
+	}
+}
+
+// noopMetricsExporter is a no-op metrics exporter
+type noopMetricsExporter struct{}
+
+func (e *noopMetricsExporter) Export(ctx context.Context, rm *sdkmetric.ResourceMetrics) error {
+	return nil
+}
+
+func (e *noopMetricsExporter) Shutdown(ctx context.Context) error {
+	return nil
+}
+
+func (e *noopMetricsExporter) Temporality(kind sdkmetric.InstrumentKind) sdkmetric.Temporality {
+	return sdkmetric.TemporalityCumulative
+}
+
+func (e *noopMetricsExporter) Aggregation(kind sdkmetric.InstrumentKind) sdkmetric.Aggregation {
+	return sdkmetric.DefaultAggregationSelector(kind)
+}
+
+// initializeMetrics creates common metric instruments
+func (mp *MetricsProvider) initializeMetrics() error {
+	var err error
+
+	// HTTP metrics
+	mp.httpRequestDuration, err = mp.meter.Float64Histogram(
+		"http_request_duration_seconds",
+		metric.WithDescription("HTTP request duration in seconds"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	mp.httpRequestCount, err = mp.meter.Int64Counter(
+		"http_requests_total",
+		metric.WithDescription("Total number of HTTP requests"),
+	)
+	if err != nil {
+		return err
+	}
+
+	mp.httpActiveConnections, err = mp.meter.Int64UpDownCounter(
+		"http_active_connections",
+		metric.WithDescription("Number of active HTTP connections"),
+	)
+	if err != nil {
+		return err
+	}
+
+	// Health check metrics
+	mp.healthCheckDuration, err = mp.meter.Float64Histogram(
+		"health_check_duration_seconds",
+		metric.WithDescription("Health check duration in seconds"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	mp.healthCheckCount, err = mp.meter.Int64Counter(
+		"health_checks_total",
+		metric.WithDescription("Total number of health checks"),
+	)
+	if err != nil {
+		return err
+	}
+
+	// Dependency check metrics
+	mp.dependencyCheckDuration, err = mp.meter.Float64Histogram(
+		"dependency_check_duration_seconds",
+		metric.WithDescription("Dependency check duration in seconds"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	mp.dependencyCheckCount, err = mp.meter.Int64Counter(
+		"dependency_checks_total",
+		metric.WithDescription("Total number of dependency checks"),
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// initializeRuntimeMetrics creates runtime metric instruments
+func (mp *MetricsProvider) initializeRuntimeMetrics() error {
+	var err error
+
+	mp.runtimeMetrics = &RuntimeMetrics{}
+
+	// Go memory metrics
+	mp.runtimeMetrics.goMemory, err = mp.meter.Int64ObservableGauge(
+		"go_memory_usage_bytes",
+		metric.WithDescription("Go memory usage in bytes"),
+		metric.WithUnit("bytes"),
+		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			
+			o.Observe(int64(m.Alloc), metric.WithAttributes(attribute.String("type", "alloc")))
+			o.Observe(int64(m.TotalAlloc), metric.WithAttributes(attribute.String("type", "total_alloc")))
+			o.Observe(int64(m.Sys), metric.WithAttributes(attribute.String("type", "sys")))
+			o.Observe(int64(m.HeapAlloc), metric.WithAttributes(attribute.String("type", "heap_alloc")))
+			o.Observe(int64(m.HeapSys), metric.WithAttributes(attribute.String("type", "heap_sys")))
+			o.Observe(int64(m.HeapInuse), metric.WithAttributes(attribute.String("type", "heap_inuse")))
+			
+			return nil
+		}),
+	)
+	if err != nil {
+		return err
+	}
+
+	// Go goroutines
+	mp.runtimeMetrics.goGoroutines, err = mp.meter.Int64ObservableGauge(
+		"go_goroutines",
+		metric.WithDescription("Number of goroutines"),
+		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
+			o.Observe(int64(runtime.NumGoroutine()))
+			return nil
+		}),
+	)
+	if err != nil {
+		return err
+	}
+
+	// GC metrics
+	mp.runtimeMetrics.goGCCount, err = mp.meter.Int64ObservableCounter(
+		"go_gc_cycles_total",
+		metric.WithDescription("Total number of GC cycles"),
+		metric.WithInt64Callback(func(ctx context.Context, o metric.Int64Observer) error {
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			o.Observe(int64(m.NumGC))
+			return nil
+		}),
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RecordHTTPRequest records HTTP request metrics
+func (mp *MetricsProvider) RecordHTTPRequest(ctx context.Context, method, path string, statusCode int, duration time.Duration) {
+	attrs := []attribute.KeyValue{
+		attribute.String("method", method),
+		attribute.String("path", path),
+		attribute.Int("status_code", statusCode),
+		attribute.String("status_class", fmt.Sprintf("%dxx", statusCode/100)),
+	}
+
+	mp.httpRequestDuration.Record(ctx, duration.Seconds(), metric.WithAttributes(attrs...))
+	mp.httpRequestCount.Add(ctx, 1, metric.WithAttributes(attrs...))
+}
+
+// RecordHealthCheck records health check metrics
+func (mp *MetricsProvider) RecordHealthCheck(ctx context.Context, checkName, status string, duration time.Duration) {
+	attrs := []attribute.KeyValue{
+		attribute.String("check_name", checkName),
+		attribute.String("status", status),
+	}
+
+	mp.healthCheckDuration.Record(ctx, duration.Seconds(), metric.WithAttributes(attrs...))
+	mp.healthCheckCount.Add(ctx, 1, metric.WithAttributes(attrs...))
+}
+
+// RecordDependencyCheck records dependency check metrics
+func (mp *MetricsProvider) RecordDependencyCheck(ctx context.Context, dependency, status string, duration time.Duration) {
+	attrs := []attribute.KeyValue{
+		attribute.String("dependency", dependency),
+		attribute.String("status", status),
+	}
+
+	mp.dependencyCheckDuration.Record(ctx, duration.Seconds(), metric.WithAttributes(attrs...))
+	mp.dependencyCheckCount.Add(ctx, 1, metric.WithAttributes(attrs...))
+}
+
+// IncrementActiveConnections increments active HTTP connections
+func (mp *MetricsProvider) IncrementActiveConnections(ctx context.Context) {
+	mp.httpActiveConnections.Add(ctx, 1)
+}
+
+// DecrementActiveConnections decrements active HTTP connections
+func (mp *MetricsProvider) DecrementActiveConnections(ctx context.Context) {
+	mp.httpActiveConnections.Add(ctx, -1)
+}
+
+// GetPrometheusHandler returns the Prometheus HTTP handler
+func (mp *MetricsProvider) GetPrometheusHandler() (http.Handler, error) {
+	if mp.promExporter == nil {
+		return nil, fmt.Errorf("Prometheus exporter not configured")
+	}
+	return mp.promExporter, nil
+}
+
+// StartPrometheusServer starts a Prometheus metrics server
+func (mp *MetricsProvider) StartPrometheusServer() error {
+	if mp.promExporter == nil {
+		return fmt.Errorf("Prometheus exporter not configured")
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", mp.promExporter)
+	
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%d", mp.config.PrometheusPort),
+		Handler: mux,
+	}
+
+	log.Printf("Starting Prometheus metrics server on port %d", mp.config.PrometheusPort)
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("Prometheus server error: %v", err)
+		}
+	}()
+
+	return nil
+}
+
+// Shutdown gracefully shuts down the metrics provider
+func (mp *MetricsProvider) Shutdown(ctx context.Context) error {
+	return mp.provider.Shutdown(ctx)
+}
+
+// Global metrics provider instance
+var globalMetricsProvider *MetricsProvider
+
+// InitializeMetrics initializes global metrics
+func InitializeMetrics(config MetricsConfig) error {
+	provider, err := NewMetricsProvider(config)
+	if err != nil {
+		return err
+	}
+
+	globalMetricsProvider = provider
+	
+	// Start Prometheus server if configured
+	if config.ExporterType == "prometheus" {
+		err = provider.StartPrometheusServer()
+		if err != nil {
+			log.Printf("Failed to start Prometheus server: %v", err)
+		}
+	}
+
+	log.Printf("Metrics initialized with %s exporter", config.ExporterType)
+	return nil
+}
+
+// GetGlobalMetricsProvider returns the global metrics provider
+func GetGlobalMetricsProvider() *MetricsProvider {
+	return globalMetricsProvider
+}
+
+// ShutdownMetrics shuts down global metrics
+func ShutdownMetrics(ctx context.Context) error {
+	if globalMetricsProvider != nil {
+		return globalMetricsProvider.Shutdown(ctx)
+	}
+	return nil
+}
+
+// DefaultMetricsConfig returns default metrics configuration
+func DefaultMetricsConfig(serviceName, version string) MetricsConfig {
+	return MetricsConfig{
+		ServiceName:      serviceName,
+		ServiceVersion:   version,
+		Environment:      getEnvWithDefault("ENVIRONMENT", "development"),
+		ExporterType:     getEnvWithDefault("METRICS_EXPORTER", "prometheus"),
+		PrometheusPort:   parseIntWithDefault("PROMETHEUS_PORT", 9090),
+		OTLPEndpoint:     os.Getenv("OTLP_METRICS_ENDPOINT"),
+		CollectionPeriod: parseDurationWithDefault("METRICS_COLLECTION_PERIOD", 15*time.Second),
+		EnableRuntime:    getEnvWithDefault("METRICS_RUNTIME", "true") == "true",
+	}
+}
+
+// Helper functions for configuration
+func getEnvWithDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func parseIntWithDefault(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if parsed, err := fmt.Sscanf(value, "%d", &defaultValue); err == nil && parsed == 1 {
+			return defaultValue
+		}
+	}
+	return defaultValue
+}
+
+func parseDurationWithDefault(key string, defaultValue time.Duration) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		if parsed, err := time.ParseDuration(value); err == nil {
+			return parsed
+		}
+	}
+	return defaultValue
+}

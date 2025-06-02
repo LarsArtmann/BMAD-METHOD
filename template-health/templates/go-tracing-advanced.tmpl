@@ -1,0 +1,355 @@
+package observability
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
+	otrace "go.opentelemetry.io/otel/trace"
+)
+
+// TracingConfig holds configuration for OpenTelemetry tracing
+type TracingConfig struct {
+	ServiceName     string
+	ServiceVersion  string
+	Environment     string
+	ExporterType    string  // "jaeger", "otlp", "stdout", "noop"
+	SamplingRatio   float64 // 0.0 to 1.0
+	JaegerEndpoint  string
+	OTLPEndpoint    string
+	EnableConsole   bool
+	ResourceAttrs   map[string]string
+}
+
+// TracingProvider manages OpenTelemetry tracing
+type TracingProvider struct {
+	provider    *trace.TracerProvider
+	config      TracingConfig
+	tracer      otrace.Tracer
+	propagator  propagation.TextMapPropagator
+}
+
+// NewTracingProvider creates a new tracing provider
+func NewTracingProvider(config TracingConfig) (*TracingProvider, error) {
+	// Set defaults
+	if config.SamplingRatio == 0 {
+		config.SamplingRatio = 1.0 // Sample all traces by default
+	}
+	if config.ExporterType == "" {
+		config.ExporterType = "stdout"
+	}
+
+	// Create resource
+	res, err := resource.New(context.Background(),
+		resource.WithAttributes(
+			semconv.ServiceName(config.ServiceName),
+			semconv.ServiceVersion(config.ServiceVersion),
+			semconv.DeploymentEnvironment(config.Environment),
+		),
+		resource.WithHost(),
+		resource.WithProcess(),
+		resource.WithOS(),
+		resource.WithContainer(),
+		resource.WithFromEnv(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource: %w", err)
+	}
+
+	// Add custom resource attributes
+	if len(config.ResourceAttrs) > 0 {
+		attrs := make([]attribute.KeyValue, 0, len(config.ResourceAttrs))
+		for k, v := range config.ResourceAttrs {
+			attrs = append(attrs, attribute.String(k, v))
+		}
+		res, err = resource.Merge(res, resource.NewWithAttributes(
+			res.SchemaURL(),
+			attrs...,
+		))
+		if err != nil {
+			return nil, fmt.Errorf("failed to merge resource attributes: %w", err)
+		}
+	}
+
+	// Create exporter
+	exporter, err := createExporter(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create exporter: %w", err)
+	}
+
+	// Create tracer provider
+	var samplerOption trace.TracerProviderOption
+	if config.SamplingRatio == 1.0 {
+		samplerOption = trace.WithSampler(trace.AlwaysSample())
+	} else if config.SamplingRatio == 0.0 {
+		samplerOption = trace.WithSampler(trace.NeverSample())
+	} else {
+		samplerOption = trace.WithSampler(trace.TraceIDRatioBased(config.SamplingRatio))
+	}
+
+	tp := trace.NewTracerProvider(
+		trace.WithBatcher(exporter),
+		trace.WithResource(res),
+		samplerOption,
+	)
+
+	// Set global tracer provider
+	otel.SetTracerProvider(tp)
+
+	// Set global propagator
+	propagator := propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	)
+	otel.SetTextMapPropagator(propagator)
+
+	// Create tracer
+	tracer := tp.Tracer(config.ServiceName)
+
+	return &TracingProvider{
+		provider:   tp,
+		config:     config,
+		tracer:     tracer,
+		propagator: propagator,
+	}, nil
+}
+
+// createExporter creates the appropriate trace exporter
+func createExporter(config TracingConfig) (trace.SpanExporter, error) {
+	switch config.ExporterType {
+	case "jaeger":
+		endpoint := config.JaegerEndpoint
+		if endpoint == "" {
+			endpoint = "http://localhost:14268/api/traces"
+		}
+		return jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(endpoint)))
+
+	case "otlp":
+		endpoint := config.OTLPEndpoint
+		if endpoint == "" {
+			endpoint = "http://localhost:4318/v1/traces"
+		}
+		return otlptracehttp.New(context.Background(),
+			otlptracehttp.WithEndpoint(endpoint),
+			otlptracehttp.WithInsecure(),
+		)
+
+	case "stdout":
+		return stdouttrace.New(
+			stdouttrace.WithPrettyPrint(),
+			stdouttrace.WithoutTimestamps(),
+		)
+
+	case "noop":
+		return &noopExporter{}, nil
+
+	default:
+		return nil, fmt.Errorf("unsupported exporter type: %s", config.ExporterType)
+	}
+}
+
+// noopExporter is a no-op trace exporter for testing
+type noopExporter struct{}
+
+func (e *noopExporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) error {
+	return nil
+}
+
+func (e *noopExporter) Shutdown(ctx context.Context) error {
+	return nil
+}
+
+// StartSpan starts a new span with the given name and options
+func (tp *TracingProvider) StartSpan(ctx context.Context, spanName string, opts ...otrace.SpanStartOption) (context.Context, otrace.Span) {
+	return tp.tracer.Start(ctx, spanName, opts...)
+}
+
+// StartHTTPSpan starts a span for HTTP requests
+func (tp *TracingProvider) StartHTTPSpan(ctx context.Context, method, path string) (context.Context, otrace.Span) {
+	spanName := fmt.Sprintf("HTTP %s %s", method, path)
+	
+	ctx, span := tp.tracer.Start(ctx, spanName,
+		otrace.WithSpanKind(otrace.SpanKindServer),
+		otrace.WithAttributes(
+			semconv.HTTPMethod(method),
+			semconv.HTTPRoute(path),
+		),
+	)
+
+	return ctx, span
+}
+
+// StartDatabaseSpan starts a span for database operations
+func (tp *TracingProvider) StartDatabaseSpan(ctx context.Context, operation, table string) (context.Context, otrace.Span) {
+	spanName := fmt.Sprintf("DB %s %s", operation, table)
+	
+	ctx, span := tp.tracer.Start(ctx, spanName,
+		otrace.WithSpanKind(otrace.SpanKindClient),
+		otrace.WithAttributes(
+			semconv.DBOperation(operation),
+			semconv.DBSQLTable(table),
+		),
+	)
+
+	return ctx, span
+}
+
+// StartExternalSpan starts a span for external service calls
+func (tp *TracingProvider) StartExternalSpan(ctx context.Context, serviceName, operation string) (context.Context, otrace.Span) {
+	spanName := fmt.Sprintf("External %s %s", serviceName, operation)
+	
+	ctx, span := tp.tracer.Start(ctx, spanName,
+		otrace.WithSpanKind(otrace.SpanKindClient),
+		otrace.WithAttributes(
+			attribute.String("external.service", serviceName),
+			attribute.String("external.operation", operation),
+		),
+	)
+
+	return ctx, span
+}
+
+// RecordError records an error in the current span
+func (tp *TracingProvider) RecordError(span otrace.Span, err error, description string) {
+	if err == nil {
+		return
+	}
+
+	span.RecordError(err,
+		otrace.WithAttributes(
+			attribute.String("error.description", description),
+		),
+	)
+	span.SetStatus(otrace.StatusError, err.Error())
+}
+
+// AddSpanAttributes adds attributes to the current span
+func (tp *TracingProvider) AddSpanAttributes(span otrace.Span, attrs map[string]interface{}) {
+	attributes := make([]attribute.KeyValue, 0, len(attrs))
+	
+	for k, v := range attrs {
+		switch val := v.(type) {
+		case string:
+			attributes = append(attributes, attribute.String(k, val))
+		case int:
+			attributes = append(attributes, attribute.Int(k, val))
+		case int64:
+			attributes = append(attributes, attribute.Int64(k, val))
+		case float64:
+			attributes = append(attributes, attribute.Float64(k, val))
+		case bool:
+			attributes = append(attributes, attribute.Bool(k, val))
+		default:
+			attributes = append(attributes, attribute.String(k, fmt.Sprintf("%v", val)))
+		}
+	}
+	
+	span.SetAttributes(attributes...)
+}
+
+// InjectHeaders injects trace context into HTTP headers
+func (tp *TracingProvider) InjectHeaders(ctx context.Context, headers map[string]string) {
+	tp.propagator.Inject(ctx, &mapCarrier{headers})
+}
+
+// ExtractContext extracts trace context from HTTP headers
+func (tp *TracingProvider) ExtractContext(ctx context.Context, headers map[string]string) context.Context {
+	return tp.propagator.Extract(ctx, &mapCarrier{headers})
+}
+
+// mapCarrier implements TextMapCarrier for map[string]string
+type mapCarrier struct {
+	data map[string]string
+}
+
+func (c *mapCarrier) Get(key string) string {
+	return c.data[key]
+}
+
+func (c *mapCarrier) Set(key string, value string) {
+	c.data[key] = value
+}
+
+func (c *mapCarrier) Keys() []string {
+	keys := make([]string, 0, len(c.data))
+	for k := range c.data {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// Shutdown gracefully shuts down the tracing provider
+func (tp *TracingProvider) Shutdown(ctx context.Context) error {
+	return tp.provider.Shutdown(ctx)
+}
+
+// Global tracing provider instance
+var globalProvider *TracingProvider
+
+// InitializeTracing initializes global tracing
+func InitializeTracing(config TracingConfig) error {
+	provider, err := NewTracingProvider(config)
+	if err != nil {
+		return err
+	}
+
+	globalProvider = provider
+	log.Printf("Tracing initialized with %s exporter", config.ExporterType)
+	return nil
+}
+
+// GetGlobalProvider returns the global tracing provider
+func GetGlobalProvider() *TracingProvider {
+	return globalProvider
+}
+
+// ShutdownTracing shuts down global tracing
+func ShutdownTracing(ctx context.Context) error {
+	if globalProvider != nil {
+		return globalProvider.Shutdown(ctx)
+	}
+	return nil
+}
+
+// DefaultTracingConfig returns default tracing configuration
+func DefaultTracingConfig(serviceName, version string) TracingConfig {
+	return TracingConfig{
+		ServiceName:    serviceName,
+		ServiceVersion: version,
+		Environment:    getEnvWithDefault("ENVIRONMENT", "development"),
+		ExporterType:   getEnvWithDefault("TRACING_EXPORTER", "stdout"),
+		SamplingRatio:  parseFloatWithDefault("TRACING_SAMPLING_RATIO", 1.0),
+		JaegerEndpoint: os.Getenv("JAEGER_ENDPOINT"),
+		OTLPEndpoint:   os.Getenv("OTLP_ENDPOINT"),
+		EnableConsole:  getEnvWithDefault("TRACING_CONSOLE", "false") == "true",
+	}
+}
+
+// Helper functions for configuration
+func getEnvWithDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func parseFloatWithDefault(key string, defaultValue float64) float64 {
+	if value := os.Getenv(key); value != "" {
+		if parsed, err := fmt.Sscanf(value, "%f", &defaultValue); err == nil && parsed == 1 {
+			return defaultValue
+		}
+	}
+	return defaultValue
+}

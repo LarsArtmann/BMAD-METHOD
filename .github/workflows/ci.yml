@@ -1,0 +1,169 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  GO_VERSION: '1.21'
+  NODE_VERSION: '20'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Cache Node modules
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Install TypeSpec
+      run: npm install -g @typespec/compiler
+
+    - name: Download Go dependencies
+      run: go mod download
+
+    - name: Run Go tests
+      run: go test -v -race -coverprofile=coverage.out ./...
+
+    - name: Run Go linter
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: latest
+        args: --timeout=10m
+
+    - name: Validate TypeSpec schemas
+      run: |
+        tsp compile main.tsp --emit @typespec/openapi3
+        bash scripts/validate-schemas.sh
+
+    - name: Run BDD tests
+      run: go test -tags=integration ./features/...
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
+        flags: unittests
+
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    needs: test
+    
+    strategy:
+      matrix:
+        tier: [basic, intermediate, advanced, enterprise]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Install TypeSpec
+      run: npm install -g @typespec/compiler
+
+    - name: Build CLI
+      run: go build -o bmad-cli ./cmd/generator
+
+    - name: Generate test project
+      run: |
+        ./bmad-cli generate \
+          --name test-${{ matrix.tier }} \
+          --tier ${{ matrix.tier }} \
+          --features typescript,docker,kubernetes \
+          --output test-projects/test-${{ matrix.tier }}
+
+    - name: Test generated project
+      run: |
+        cd test-projects/test-${{ matrix.tier }}
+        go mod tidy
+        go test ./...
+        go build ./cmd/server
+
+    - name: Test TypeScript client (if enabled)
+      run: |
+        if [ -d "test-projects/test-${{ matrix.tier }}/client/typescript" ]; then
+          cd test-projects/test-${{ matrix.tier }}/client/typescript
+          npm install
+          npm run build
+          npm test
+        fi
+
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-project-${{ matrix.tier }}
+        path: test-projects/test-${{ matrix.tier }}
+        retention-days: 7
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Run Gosec security scanner
+      uses: securecodewarrior/github-action-gosec@master
+      with:
+        args: '-fmt sarif -out gosec-results.sarif ./...'
+
+    - name: Upload Gosec scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'gosec-results.sarif'

@@ -1,0 +1,115 @@
+name: Bug Report
+description: File a bug report to help us improve
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report! 🐛
+        
+        Please search existing issues before creating a new one to avoid duplicates.
+
+  - type: input
+    id: version
+    attributes:
+      label: BMAD Method Version
+      description: What version of BMAD Method are you using?
+      placeholder: "v1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Template Tier
+      description: Which tier were you using when the bug occurred?
+      options:
+        - Basic
+        - Intermediate
+        - Advanced
+        - Enterprise
+        - Not applicable
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: What operating system are you using?
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: "The CLI crashes when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Run command '...'
+        2. Select option '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear description of what you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: A clear description of what actually happened.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Logs
+      description: If applicable, add error logs to help explain your problem.
+      render: shell
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: If using a config file, please share the relevant parts (remove sensitive data).
+      render: yaml
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true

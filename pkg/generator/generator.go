@@ -1,18 +1,24 @@
 package generator
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"text/template"
+	"time"
 
 	"github.com/LarsArtmann/BMAD-METHOD/pkg/config"
 )
 
 // Generator handles the generation of health endpoint projects
 type Generator struct {
-	config    *config.ProjectConfig
-	templates *TemplateRegistry
+	config           *config.ProjectConfig
+	templates        *TemplateRegistry
+	cache            *TemplateCache
+	parallelGen      *ParallelGenerator
+	enableParallel   bool
+	enableCaching    bool
 }
 
 // TemplateRegistry manages all template files and functions
@@ -40,9 +46,19 @@ func New(cfg *config.ProjectConfig) (*Generator, error) {
 		return nil, fmt.Errorf("failed to create template registry: %w", err)
 	}
 
+	// Create template cache (1 hour max age)
+	cache := NewTemplateCache(1 * time.Hour)
+
+	// Create parallel generator with optimal worker count
+	parallelGen := NewParallelGenerator(GetOptimalWorkerCount())
+
 	return &Generator{
-		config:    cfg,
-		templates: registry,
+		config:         cfg,
+		templates:      registry,
+		cache:          cache,
+		parallelGen:    parallelGen,
+		enableParallel: true,  // Enable by default
+		enableCaching:  true,  // Enable by default
 	}, nil
 }
 
@@ -56,10 +72,43 @@ func (g *Generator) Generate() error {
 	// Create generation context
 	ctx := &GenerationContext{
 		Config:    g.config,
-		Timestamp: "2024-01-01T00:00:00Z", // TODO: Use actual timestamp
+		Timestamp: time.Now().Format(time.RFC3339),
 		Version:   "1.0.0",
 	}
 
+	if g.enableParallel {
+		return g.generateParallel(ctx)
+	}
+
+	return g.generateSequential(ctx)
+}
+
+// generateParallel generates files using parallel processing
+func (g *Generator) generateParallel(ctx *GenerationContext) error {
+	// Collect all generation tasks
+	tasks := g.collectGenerationTasks(ctx)
+
+	// Use context with timeout for parallel generation
+	genCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	// Generate files in parallel
+	summary, err := g.parallelGen.GenerateFiles(genCtx, tasks)
+	if err != nil {
+		return fmt.Errorf("parallel generation failed: %w", err)
+	}
+
+	// Check for failures
+	if summary.FailureCount > 0 {
+		return fmt.Errorf("failed to generate %d out of %d files", summary.FailureCount, summary.TotalFiles)
+	}
+
+	fmt.Printf("✅ Generated %d files in %v (parallel mode)\n", summary.SuccessCount, summary.TotalDuration)
+	return nil
+}
+
+// generateSequential generates files sequentially (fallback)
+func (g *Generator) generateSequential(ctx *GenerationContext) error {
 	// Generate core files
 	if err := g.generateCoreFiles(ctx); err != nil {
 		return fmt.Errorf("failed to generate core files: %w", err)
@@ -92,6 +141,142 @@ func (g *Generator) Generate() error {
 	}
 
 	return nil
+}
+
+// collectGenerationTasks collects all files that need to be generated
+func (g *Generator) collectGenerationTasks(ctx *GenerationContext) []GenerationTask {
+	var tasks []GenerationTask
+
+	// Core files
+	coreFiles := map[string]string{
+		"README.md":           "readme",
+		"go.mod":              "go-mod",
+		".gitignore":          "gitignore",
+		"Makefile":            "makefile",
+		"docs/API.md":         "api-docs",
+		"scripts/build.sh":    "build-script",
+		"scripts/test.sh":     "test-script",
+	}
+
+	for filename, templateName := range coreFiles {
+		tasks = append(tasks, GenerationTask{
+			Filename:     filename,
+			TemplateName: templateName,
+			Context:      ctx,
+			Generator:    g,
+		})
+	}
+
+	// Go source files
+	goFiles := map[string]string{
+		"cmd/server/main.go":           "go-main",
+		"internal/handlers/health.go":  "go-health-handler",
+		"internal/models/health.go":    "go-health-models",
+		"internal/server/server.go":    "go-server",
+		"internal/config/config.go":    "go-config",
+	}
+
+	// Add tier-specific files
+	switch g.config.Tier {
+	case config.TierIntermediate, config.TierAdvanced, config.TierEnterprise:
+		goFiles["internal/handlers/server_time.go"] = "go-server-time-handler"
+		goFiles["internal/handlers/dependencies.go"] = "go-dependencies-handler"
+	}
+
+	// Add feature-specific files
+	if g.config.Features.OpenTelemetry {
+		goFiles["internal/observability/tracing.go"] = "go-tracing"
+		goFiles["internal/observability/metrics.go"] = "go-metrics"
+	}
+
+	if g.config.Features.Security {
+		goFiles["internal/security/mtls.go"] = "go-security-mtls"
+		goFiles["internal/security/rbac.go"] = "go-security-rbac"
+		goFiles["internal/security/context.go"] = "go-security-context"
+	}
+
+	if g.config.Features.Compliance {
+		goFiles["internal/compliance/audit.go"] = "go-compliance-audit"
+	}
+
+	if g.config.Features.CloudEvents {
+		goFiles["internal/events/emitter.go"] = "go-events"
+	}
+
+	for filename, templateName := range goFiles {
+		tasks = append(tasks, GenerationTask{
+			Filename:     filename,
+			TemplateName: templateName,
+			Context:      ctx,
+			Generator:    g,
+		})
+	}
+
+	// TypeScript files
+	if g.config.Features.TypeScript {
+		tsFiles := map[string]string{
+			"client/typescript/src/client.ts":   "ts-client",
+			"client/typescript/src/types.ts":    "ts-types",
+			"client/typescript/package.json":    "ts-package-json",
+			"client/typescript/tsconfig.json":   "ts-config",
+			"client/typescript/README.md":       "ts-readme",
+		}
+
+		for filename, templateName := range tsFiles {
+			tasks = append(tasks, GenerationTask{
+				Filename:     filename,
+				TemplateName: templateName,
+				Context:      ctx,
+				Generator:    g,
+			})
+		}
+	}
+
+	// Kubernetes files
+	if g.config.Features.Kubernetes {
+		k8sFiles := map[string]string{
+			"deployments/kubernetes/deployment.yaml": "k8s-deployment",
+			"deployments/kubernetes/service.yaml":    "k8s-service",
+			"deployments/kubernetes/configmap.yaml":  "k8s-configmap",
+		}
+
+		if g.config.Kubernetes.ServiceMonitor {
+			k8sFiles["deployments/kubernetes/servicemonitor.yaml"] = "k8s-servicemonitor"
+		}
+
+		if g.config.Kubernetes.Ingress.Enabled {
+			k8sFiles["deployments/kubernetes/ingress.yaml"] = "k8s-ingress"
+		}
+
+		for filename, templateName := range k8sFiles {
+			tasks = append(tasks, GenerationTask{
+				Filename:     filename,
+				TemplateName: templateName,
+				Context:      ctx,
+				Generator:    g,
+			})
+		}
+	}
+
+	// Docker files
+	if g.config.Features.Docker {
+		dockerFiles := map[string]string{
+			"Dockerfile":         "dockerfile",
+			"docker-compose.yml": "docker-compose",
+			".dockerignore":      "dockerignore",
+		}
+
+		for filename, templateName := range dockerFiles {
+			tasks = append(tasks, GenerationTask{
+				Filename:     filename,
+				TemplateName: templateName,
+				Context:      ctx,
+				Generator:    g,
+			})
+		}
+	}
+
+	return tasks
 }
 
 // createOutputDirectory creates the output directory structure

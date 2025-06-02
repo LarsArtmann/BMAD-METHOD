@@ -1,0 +1,483 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "{{.Config.Name}} - Health & SRE Metrics",
+    "tags": ["{{.Config.Name}}", "health", "sre", "{{.Config.Tier}}"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Health Overview",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=\"{{.Config.Name}}\"}",
+            "legendFormat": "Service Up"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "displayMode": "lcd",
+              "orientation": "horizontal"
+            },
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "color": "red",
+                    "text": "DOWN"
+                  },
+                  "1": {
+                    "color": "green",
+                    "text": "UP"
+                  }
+                },
+                "type": "value"
+              }
+            ],
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "green",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Request Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{job=\"{{.Config.Name}}\"}[5m]))",
+            "legendFormat": "Requests/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "reqps"
+          }
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{job=\"{{.Config.Name}}\", status_code=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"{{.Config.Name}}\"}[5m])) * 100",
+            "legendFormat": "Error Rate %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 1
+                },
+                {
+                  "color": "red",
+                  "value": 5
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 4,
+        "title": "P95 Response Time",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"{{.Config.Name}}\"}[5m]))",
+            "legendFormat": "P95 Latency"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "s",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.1
+                },
+                {
+                  "color": "red",
+                  "value": 0.5
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        }
+      },
+      {
+        "id": 5,
+        "title": "SLO Availability (30d)",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "{{.Config.Name}}:availability_sli",
+            "legendFormat": "Current Availability"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "min": 0.99,
+            "max": 1,
+            "unit": "percentunit",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.999
+                },
+                {
+                  "color": "green",
+                  "value": 0.9995
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 4
+        }
+      },
+      {
+        "id": 6,
+        "title": "Error Budget Remaining",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "{{.Config.Name}}:error_budget_remaining_30d",
+            "legendFormat": "Error Budget %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "min": 0,
+            "max": 1,
+            "unit": "percentunit",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.1
+                },
+                {
+                  "color": "green",
+                  "value": 0.5
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 4
+        }
+      },
+      {
+        "id": 7,
+        "title": "Request Rate Over Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{job=\"{{.Config.Name}}\"}[5m])) by (status_code)",
+            "legendFormat": "{{`{{status_code}}`}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Requests/sec",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 12
+        }
+      },
+      {
+        "id": 8,
+        "title": "Response Time Percentiles",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"{{.Config.Name}}\"}[5m]))",
+            "legendFormat": "P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"{{.Config.Name}}\"}[5m]))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=\"{{.Config.Name}}\"}[5m]))",
+            "legendFormat": "P99"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Response Time (s)",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 12
+        }
+      },
+      {
+        "id": 9,
+        "title": "Health Check Status",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(health_checks_total{job=\"{{.Config.Name}}\"}[5m]) by (check_name, status)",
+            "legendFormat": "{{`{{check_name}}`}} - {{`{{status}}`}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Checks/sec",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 20
+        }
+      }
+{{- if ne .Config.Tier "basic"}},
+      {
+        "id": 10,
+        "title": "Dependency Health",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(dependency_checks_total{job=\"{{.Config.Name}}\"}[5m]) by (dependency, status)",
+            "legendFormat": "{{`{{dependency}}`}} - {{`{{status}}`}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Checks/sec",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 20
+        }
+      }
+{{- end}}
+{{- if or (eq .Config.Tier "advanced") (eq .Config.Tier "enterprise")}},
+      {
+        "id": 11,
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "go_memory_usage_bytes{job=\"{{.Config.Name}}\", type=\"alloc\"}",
+            "legendFormat": "Allocated Memory"
+          },
+          {
+            "expr": "go_memory_usage_bytes{job=\"{{.Config.Name}}\", type=\"sys\"}",
+            "legendFormat": "System Memory"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Bytes",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 28
+        }
+      },
+      {
+        "id": 12,
+        "title": "Goroutines & GC",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "go_goroutines{job=\"{{.Config.Name}}\"}",
+            "legendFormat": "Goroutines"
+          },
+          {
+            "expr": "rate(go_gc_cycles_total{job=\"{{.Config.Name}}\"}[5m])",
+            "legendFormat": "GC Rate"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Count/Rate",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 28
+        }
+      }
+{{- end}}
+{{- if eq .Config.Tier "enterprise"}},
+      {
+        "id": 13,
+        "title": "Security Events",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"{{.Config.Name}}\", status_code=\"401\"}[5m])",
+            "legendFormat": "Unauthorized (401)"
+          },
+          {
+            "expr": "rate(http_requests_total{job=\"{{.Config.Name}}\", status_code=\"403\"}[5m])",
+            "legendFormat": "Forbidden (403)"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Events/sec",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 36
+        }
+      }
+{{- end}}
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": [
+        "5s",
+        "10s",
+        "30s",
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "1d"
+      ]
+    },
+    "templating": {
+      "list": []
+    },
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    },
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 1,
+    "links": []
+  }
+}

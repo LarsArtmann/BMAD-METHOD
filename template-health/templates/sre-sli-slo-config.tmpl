@@ -1,0 +1,310 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{.Config.Name}}-sli-slo-config
+  namespace: {{.Config.Namespace | default "default"}}
+  labels:
+    app: {{.Config.Name}}
+    tier: {{.Config.Tier}}
+    component: sre-config
+data:
+  sli-slo.yaml: |
+    # Service Level Indicators and Objectives for {{.Config.Name}}
+    service:
+      name: {{.Config.Name}}
+      tier: {{.Config.Tier}}
+      version: {{.Config.Version}}
+      owner: {{.Config.Owner | default "platform-team"}}
+      
+    # Service Level Indicators (SLIs)
+    slis:
+      # Availability SLI - Success rate of all requests
+      availability:
+        description: "Percentage of successful HTTP requests"
+        implementation:
+          prometheus:
+            total_query: 'sum(rate(http_requests_total{job="{{.Config.Name}}"}[${window}]))'
+            good_query: 'sum(rate(http_requests_total{job="{{.Config.Name}}", status_code!~"5.."}[${window}]))'
+        objective_percentage: 99.9
+        
+      # Latency SLI - Response time percentiles
+      latency:
+        description: "95th percentile of HTTP request latency"
+        implementation:
+          prometheus:
+            query: 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="{{.Config.Name}}"}[${window}]))'
+            threshold: 0.1  # 100ms
+        objective_percentage: 95.0
+        
+      # Quality SLI - Error rate threshold
+      quality:
+        description: "Percentage of requests with acceptable error rates"
+        implementation:
+          prometheus:
+            total_query: 'sum(rate(http_requests_total{job="{{.Config.Name}}"}[${window}]))'
+            good_query: 'sum(rate(http_requests_total{job="{{.Config.Name}}", status_code!~"[45].."}[${window}]))'
+        objective_percentage: 99.5
+
+{{- if ne .Config.Tier "basic"}}
+      # Dependency SLI - External dependency health
+      dependency_health:
+        description: "Percentage of successful dependency checks"
+        implementation:
+          prometheus:
+            total_query: 'sum(rate(dependency_checks_total{job="{{.Config.Name}}"}[${window}]))'
+            good_query: 'sum(rate(dependency_checks_total{job="{{.Config.Name}}", status="healthy"}[${window}]))'
+        objective_percentage: 99.0
+{{- end}}
+
+{{- if or (eq .Config.Tier "advanced") (eq .Config.Tier "enterprise")}}
+      # Resource SLI - System resource utilization
+      resource_utilization:
+        description: "Percentage of time with acceptable resource usage"
+        implementation:
+          prometheus:
+            query: '(go_memory_usage_bytes{job="{{.Config.Name}}", type="alloc"} / go_memory_usage_bytes{job="{{.Config.Name}}", type="sys"}) < 0.85'
+        objective_percentage: 98.0
+{{- end}}
+
+    # Service Level Objectives (SLOs)
+    slos:
+      # Monthly SLOs (30-day rolling window)
+      - name: monthly_availability
+        service_level_indicator: availability
+        objective: 99.9
+        window: 30d
+        alerting:
+          - name: slo_burn_rate_5m
+            condition: 'error_rate > 14.4 * (1 - 0.999)'  # 14.4x burn rate
+            for: 2m
+            severity: critical
+          - name: slo_burn_rate_1h
+            condition: 'error_rate > 6 * (1 - 0.999)'     # 6x burn rate
+            for: 15m
+            severity: critical
+          - name: slo_burn_rate_6h
+            condition: 'error_rate > 3 * (1 - 0.999)'     # 3x burn rate
+            for: 1h
+            severity: warning
+            
+      - name: monthly_latency
+        service_level_indicator: latency
+        objective: 95.0
+        threshold: 100ms
+        window: 30d
+        alerting:
+          - name: latency_degradation
+            condition: 'p95_latency > 200ms'
+            for: 5m
+            severity: warning
+          - name: latency_critical
+            condition: 'p95_latency > 500ms'
+            for: 2m
+            severity: critical
+            
+      # Weekly SLOs (7-day rolling window)
+      - name: weekly_availability
+        service_level_indicator: availability
+        objective: 99.95
+        window: 7d
+        
+      - name: weekly_quality
+        service_level_indicator: quality
+        objective: 99.8
+        window: 7d
+
+{{- if ne .Config.Tier "basic"}}
+      - name: weekly_dependency_health
+        service_level_indicator: dependency_health
+        objective: 99.5
+        window: 7d
+        alerting:
+          - name: dependency_degradation
+            condition: 'dependency_success_rate < 95%'
+            for: 10m
+            severity: warning
+{{- end}}
+
+    # Error Budget Policies
+    error_budget_policy:
+      # Policy for monthly SLOs
+      - slo_name: monthly_availability
+        policies:
+          - condition: "error_budget_remaining > 0.5"
+            actions:
+              - type: "notification"
+                channels: ["slack", "email"]
+              - type: "documentation"
+                message: "Normal operations - error budget healthy"
+                
+          - condition: "error_budget_remaining <= 0.5 AND error_budget_remaining > 0.1"
+            actions:
+              - type: "notification"
+                channels: ["slack", "email", "pagerduty"]
+                severity: "warning"
+              - type: "freeze"
+                scope: "non_critical_releases"
+              - type: "documentation"
+                message: "Error budget at risk - restricting non-critical changes"
+                
+          - condition: "error_budget_remaining <= 0.1"
+            actions:
+              - type: "notification"
+                channels: ["slack", "email", "pagerduty"]
+                severity: "critical"
+              - type: "freeze"
+                scope: "all_releases"
+              - type: "escalation"
+                team: "oncall_engineer"
+              - type: "documentation"
+                message: "Error budget exhausted - all releases frozen until recovery"
+
+    # Monitoring Configuration
+    monitoring:
+      # Prometheus recording rules for SLI calculations
+      recording_rules:
+        - name: "{{.Config.Name}}_sli_availability_5m"
+          expr: |
+            sum(rate(http_requests_total{job="{{.Config.Name}}", status_code!~"5.."}[5m])) /
+            sum(rate(http_requests_total{job="{{.Config.Name}}"}[5m]))
+          labels:
+            service: "{{.Config.Name}}"
+            sli: "availability"
+            
+        - name: "{{.Config.Name}}_sli_latency_p95_5m"
+          expr: |
+            histogram_quantile(0.95, 
+              rate(http_request_duration_seconds_bucket{job="{{.Config.Name}}"}[5m])
+            )
+          labels:
+            service: "{{.Config.Name}}"
+            sli: "latency"
+            
+        - name: "{{.Config.Name}}_error_budget_30d"
+          expr: |
+            1 - (
+              (1 - sum(rate(http_requests_total{job="{{.Config.Name}}", status_code!~"5.."}[30d])) /
+               sum(rate(http_requests_total{job="{{.Config.Name}}"}[30d]))) / 0.001
+            )
+          labels:
+            service: "{{.Config.Name}}"
+            window: "30d"
+
+      # Grafana dashboard configuration
+      dashboards:
+        - name: "{{.Config.Name}}-sre-overview"
+          path: "/etc/grafana/dashboards/{{.Config.Name}}-sre-overview.json"
+          folder: "SRE"
+          tags: ["{{.Config.Name}}", "sre", "{{.Config.Tier}}"]
+          
+      # Alert manager configuration
+      alerting:
+        notification_channels:
+          - name: "{{.Config.Name}}-slack"
+            type: "slack"
+            settings:
+              webhook_url: "${SLACK_WEBHOOK_URL}"
+              channel: "#{{.Config.Name}}-alerts"
+              title: "{{.Config.Name}} SLO Alert"
+              
+          - name: "{{.Config.Name}}-email"
+            type: "email"
+            settings:
+              addresses: ["oncall-{{.Config.Name}}@{{.Config.Domain | default "example.com"}}"]
+              
+{{- if eq .Config.Tier "enterprise"}}
+          - name: "{{.Config.Name}}-pagerduty"
+            type: "pagerduty"
+            settings:
+              integration_key: "${PAGERDUTY_INTEGRATION_KEY}"
+              severity: "critical"
+{{- end}}
+
+    # Incident Response Playbooks
+    playbooks:
+      - name: "availability_slo_breach"
+        trigger: "monthly_availability SLO < 99.9%"
+        steps:
+          - "Check service health dashboard"
+          - "Identify error sources from logs"
+          - "Scale service if resource constrained"
+          - "Roll back recent deployments if correlation found"
+          - "Engage incident commander if issue persists > 15min"
+          
+      - name: "latency_slo_breach"
+        trigger: "monthly_latency SLO degraded"
+        steps:
+          - "Check response time percentiles"
+          - "Analyze slow query logs"
+          - "Verify downstream dependency health"
+          - "Check for traffic spikes"
+          - "Consider circuit breaker activation"
+
+{{- if ne .Config.Tier "basic"}}
+      - name: "dependency_health_degraded"
+        trigger: "dependency_health SLI < 99%"
+        steps:
+          - "Identify failing dependencies"
+          - "Check dependency service status pages"
+          - "Activate circuit breakers for degraded services"
+          - "Switch to fallback mechanisms where available"
+          - "Contact dependency service owners"
+{{- end}}
+
+    # SLO Reporting
+    reporting:
+      frequency: "weekly"
+      recipients:
+        - "team-{{.Config.Name}}@{{.Config.Domain | default "example.com"}}"
+        - "sre-team@{{.Config.Domain | default "example.com"}}"
+      metrics:
+        - "SLO achievement percentage"
+        - "Error budget consumption rate"
+        - "Mean time to recovery (MTTR)"
+        - "Incident count and severity"
+        - "Change success rate"
+        
+      # Historical data retention
+      retention:
+        sli_data: "1y"        # Raw SLI measurements
+        slo_data: "2y"        # SLO compliance data
+        incident_data: "3y"   # Incident and outage data
+        
+    # Capacity Planning
+    capacity:
+      # Resource utilization thresholds for capacity alerts
+      thresholds:
+        cpu_utilization: 70
+        memory_utilization: 80
+        disk_utilization: 75
+        network_utilization: 60
+        
+      # Growth planning
+      growth_planning:
+        forecast_window: "3m"  # 3 months ahead
+        growth_rate_threshold: "20%"  # Alert if growth > 20% month-over-month
+        capacity_buffer: "30%"  # Maintain 30% capacity buffer
+
+{{- if eq .Config.Tier "enterprise"}}
+    # Compliance and Audit
+    compliance:
+      # Data retention for compliance
+      audit_retention: "7y"
+      
+      # Required SLO documentation
+      documentation:
+        - "SLI measurement methodology"
+        - "SLO rationale and business justification"
+        - "Error budget policy and approval process"
+        - "Incident response procedures"
+        - "Capacity planning methodology"
+        
+      # Regular SLO reviews
+      reviews:
+        frequency: "quarterly"
+        participants:
+          - "Service owner"
+          - "SRE team"
+          - "Product management"
+          - "Engineering leadership"
+{{- end}}

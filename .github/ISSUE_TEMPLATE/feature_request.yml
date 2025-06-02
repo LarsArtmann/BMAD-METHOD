@@ -1,0 +1,143 @@
+name: Feature Request
+description: Suggest an idea for BMAD Method
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your interest in improving BMAD Method! 🚀
+        
+        Please search existing issues and discussions before creating a new feature request.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Feature Category
+      description: What category does this feature belong to?
+      options:
+        - CLI Enhancement
+        - Template System
+        - TypeSpec Integration
+        - Code Generation
+        - Documentation
+        - Developer Experience
+        - Performance
+        - Security
+        - Observability
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Target Tier
+      description: Which tier(s) would this feature apply to?
+      multiple: true
+      options:
+        - Basic
+        - Intermediate
+        - Advanced
+        - Enterprise
+        - All Tiers
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? What's the current pain point?
+      placeholder: "Currently, users have to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see implemented.
+      placeholder: "I would like to see..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds?
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Examples/References
+      description: Are there examples from other tools or projects that implement something similar?
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Estimated Complexity
+      description: How complex do you think this feature would be to implement?
+      options:
+        - Low (Few hours)
+        - Medium (Few days)
+        - High (Few weeks)
+        - Very High (Few months)
+        - Unknown
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Low (Nice to have)
+        - Medium (Would improve workflow)
+        - High (Significant impact)
+        - Critical (Blocking adoption)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: impact
+    attributes:
+      label: Impact Areas
+      description: Which areas would this feature impact? (Select all that apply)
+      options:
+        - label: User Experience
+        - label: Performance
+        - label: Security
+        - label: Maintainability
+        - label: Documentation
+        - label: Testing
+        - label: Deployment
+        - label: Compatibility
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Contribution preferences
+      options:
+        - label: I would be willing to implement this feature
+        - label: I would be willing to help with testing
+        - label: I would be willing to help with documentation
+        - label: I would be willing to provide feedback during development
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context, mockups, or examples about the feature request here.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
