@@ -34,7 +34,7 @@ Examples:
   template-health-endpoint generate --tier advanced --name my-service --features opentelemetry,cloudevents
 
   # Validate TypeSpec schemas
-  template-health-endpoint validate --schemas pkg/schemas/health/
+  template-health-endpoint validate --schemas template-health/schemas/
 
 For more information, visit: https://github.com/LarsArtmann/BMAD-METHOD`,
 	Version: "1.0.0",

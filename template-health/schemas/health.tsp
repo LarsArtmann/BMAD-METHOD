@@ -122,6 +122,38 @@ model PerformanceMetrics {
 }
 
 /**
+ * Core server time information with timezone details
+ */
+model ServerTimeInfo {
+  /** Server timezone identifier (e.g., "UTC", "America/New_York") */
+  timezone: string;
+  
+  /** Current time in UTC */
+  utcTime: utcDateTime;
+  
+  /** Current time in server's local timezone */
+  localTime: utcDateTime;
+  
+  /** UTC offset string (e.g., "+00:00", "-05:00") */
+  utcOffset: string;
+  
+  /** Unix timestamp in seconds */
+  epoch: int64;
+  
+  /** ISO8601 formatted timestamp */
+  iso8601: string;
+  
+  /** RFC3339 nano precision timestamp */
+  rfc3339Nano: string;
+  
+  /** Timezone abbreviation (e.g., "UTC", "EST") */
+  timezoneAbbr: string;
+  
+  /** Whether daylight saving time is active */
+  isDST: boolean;
+}
+
+/**
  * Server-Timing API metrics for performance analysis
  */
 model ServerTimingMetrics {

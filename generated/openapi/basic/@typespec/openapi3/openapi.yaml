@@ -541,44 +541,6 @@ components:
           type: string
           description: Optional trace ID for debugging
       description: Error response model for health API endpoints
-    IntermediateTier.IntermediateHealthReport:
-      type: object
-      properties:
-        otelMetrics:
-          type: object
-          properties:
-            spanCount:
-              type: integer
-              format: int32
-              description: Number of spans created
-            metricsExported:
-              type: integer
-              format: int32
-              description: Number of metrics exported
-            samplingRate:
-              type: number
-              format: double
-              description: Trace sampling rate
-          description: Basic OpenTelemetry metrics for observability
-        cacheStats:
-          type: object
-          properties:
-            hitRate:
-              type: number
-              format: double
-              description: Cache hit rate percentage
-            entryCount:
-              type: integer
-              format: int32
-              description: Number of cache entries
-            memoryUsage:
-              type: integer
-              format: int64
-              description: Cache memory usage in bytes
-          description: Cache layer statistics if enabled
-      allOf:
-        - $ref: '#/components/schemas/HealthAPI.HealthReport'
-      description: Enhanced health report for intermediate tier
     ServerTime:
       type: object
       required:

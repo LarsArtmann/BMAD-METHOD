@@ -1,10 +1,10 @@
 import "@typespec/http";
 import "@typespec/rest";
 import "@typespec/openapi3";
-import "../health/health.tsp";
-import "../health/server-time.tsp";
-import "../health/health-api.tsp";
-import "../health/cloudevents.tsp";
+import "../../../template-health/schemas/health.tsp";
+import "../../../template-health/schemas/server-time.tsp";
+import "../../../template-health/schemas/health-api.tsp";
+import "../../../template-health/schemas/cloudevents.tsp";
 
 using TypeSpec.Http;
 using TypeSpec.Rest;

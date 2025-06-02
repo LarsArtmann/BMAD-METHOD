@@ -21,19 +21,19 @@ echo "📋 Validating core health schemas..."
 
 # Validate health.tsp
 echo "  ✓ Validating health.tsp..."
-tsp compile pkg/schemas/health/health.tsp --output-dir generated/schemas/health
+tsp compile template-health/schemas/health.tsp --output-dir generated/schemas/health
 
 # Validate server-time.tsp
 echo "  ✓ Validating server-time.tsp..."
-tsp compile pkg/schemas/health/server-time.tsp --output-dir generated/schemas/server-time
+tsp compile template-health/schemas/server-time.tsp --output-dir generated/schemas/server-time
 
 # Validate health-api.tsp
 echo "  ✓ Validating health-api.tsp..."
-tsp compile pkg/schemas/health/health-api.tsp --output-dir generated/schemas/health-api
+tsp compile template-health/schemas/health-api.tsp --output-dir generated/schemas/health-api
 
 # Validate cloudevents.tsp
 echo "  ✓ Validating cloudevents.tsp..."
-tsp compile pkg/schemas/health/cloudevents.tsp --output-dir generated/schemas/cloudevents
+tsp compile template-health/schemas/cloudevents.tsp --output-dir generated/schemas/cloudevents
 
 # Validate basic tier
 echo "  ✓ Validating basic tier..."
@@ -42,7 +42,7 @@ tsp compile pkg/schemas/tiers/basic.tsp --output-dir generated/schemas/basic
 echo "📊 Generating OpenAPI v3 specifications..."
 
 # Generate OpenAPI for health API
-tsp compile pkg/schemas/health/health-api.tsp --emit @typespec/openapi3 --output-dir generated/openapi/health-api
+tsp compile template-health/schemas/health-api.tsp --emit @typespec/openapi3 --output-dir generated/openapi/health-api
 
 # Generate OpenAPI for basic tier
 tsp compile pkg/schemas/tiers/basic.tsp --emit @typespec/openapi3 --output-dir generated/openapi/basic
@@ -50,7 +50,7 @@ tsp compile pkg/schemas/tiers/basic.tsp --emit @typespec/openapi3 --output-dir g
 echo "📋 Generating JSON Schemas..."
 
 # Generate JSON Schema for models
-tsp compile pkg/schemas/health/health.tsp --emit @typespec/json-schema --output-dir generated/schemas/json
+tsp compile template-health/schemas/health.tsp --emit @typespec/json-schema --output-dir generated/schemas/json
 
 echo "✅ All schemas validated successfully!"
 

@@ -3,10 +3,10 @@ import "@typespec/rest";
 import "@typespec/openapi3";
 
 // Import all health endpoint schemas
-import "./pkg/schemas/health/health.tsp";
-import "./pkg/schemas/health/server-time.tsp";
-import "./pkg/schemas/health/health-api.tsp";
-import "./pkg/schemas/health/cloudevents.tsp";
+import "./template-health/schemas/health.tsp";
+import "./template-health/schemas/server-time.tsp";
+import "./template-health/schemas/health-api.tsp";
+import "./template-health/schemas/cloudevents.tsp";
 
 // Import tier-specific schemas
 import "./pkg/schemas/tiers/basic.tsp";
